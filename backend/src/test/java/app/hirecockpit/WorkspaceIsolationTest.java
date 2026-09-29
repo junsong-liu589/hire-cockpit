@@ -66,6 +66,16 @@ class WorkspaceIsolationTest {
         assertThat(interview.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         ResponseEntity<String> scheduled=http.exchange(url("/api/v1/calendar?from="+URLEncoder.encode(Instant.now().minusSeconds(60).toString(),StandardCharsets.UTF_8)+"&to="+URLEncoder.encode(interviewAt.plusSeconds(3600).toString(),StandardCharsets.UTF_8)),HttpMethod.GET,new HttpEntity<>(ah),String.class);
         assertThat(scheduled.getBody()).contains("一面");
+        ResponseEntity<String> offer=http.exchange(url("/api/v1/offers"),HttpMethod.POST,new HttpEntity<>("{\"applicationId\":\""+applicationId+"\",\"baseSalary\":25000,\"bonus\":50000,\"workCity\":\"上海\",\"decision\":\"待决定\",\"evaluations\":{\"growth\":90,\"role\":85,\"location\":80,\"culture\":75}}",ah),String.class);
+        assertThat(offer.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        ResponseEntity<String> offerCompare=http.exchange(url("/api/v1/offers/comparison"),HttpMethod.GET,new HttpEntity<>(ah),String.class);
+        assertThat(offerCompare.getBody()).contains("Private A","comparisonScore");
+        ResponseEntity<String> bOffers=http.exchange(url("/api/v1/offers"),HttpMethod.GET,new HttpEntity<>(bh),String.class);
+        assertThat(bOffers.getBody()).doesNotContain("Private A");
+        ResponseEntity<String> crossOffer=http.exchange(url("/api/v1/offers"),HttpMethod.POST,new HttpEntity<>("{\"applicationId\":\""+applicationId+"\",\"baseSalary\":25000}",bh),String.class);
+        assertThat(crossOffer.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        ResponseEntity<String> analytics=http.exchange(url("/api/v1/analytics"),HttpMethod.GET,new HttpEntity<>(ah),String.class);
+        assertThat(analytics.getBody()).contains("APPLICATION","OFFER","monthlyApplications");
         ResponseEntity<String> bTasks=http.exchange(url("/api/v1/tasks"),HttpMethod.GET,new HttpEntity<>(bh),String.class);
         assertThat(bTasks.getBody()).doesNotContain("Timezone task");
         String workspaceId=new com.fasterxml.jackson.databind.ObjectMapper().readTree(aBootstrap.getBody()).get("workspaceId").asText();
