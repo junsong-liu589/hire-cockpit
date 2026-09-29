@@ -93,6 +93,11 @@ class WorkspaceIsolationTest {
         assertThat(privateDownload.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         ResponseEntity<byte[]> ownDownload=http.exchange(url("/api/v1/files/"+fileId+"/download"),HttpMethod.GET,new HttpEntity<>(ah),byte[].class);
         assertThat(ownDownload.getStatusCode()).isEqualTo(HttpStatus.OK);assertThat(ownDownload.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION)).contains("resume.pdf");
+        ResponseEntity<byte[]> backup=http.exchange(url("/api/v1/backup/export"),HttpMethod.GET,new HttpEntity<>(ah),byte[].class);assertThat(backup.getStatusCode()).isEqualTo(HttpStatus.OK);assertThat(backup.getHeaders().getContentType()).isEqualTo(MediaType.parseMediaType("application/zip"));
+        HttpHeaders backupHeaders=headers(aCookie,aCsrf);backupHeaders.setContentType(MediaType.MULTIPART_FORM_DATA);LinkedMultiValueMap<String,Object> previewForm=new LinkedMultiValueMap<>();previewForm.add("file",new ByteArrayResource(backup.getBody()){@Override public String getFilename(){return "backup.zip";}});
+        ResponseEntity<String> preview=http.exchange(url("/api/v1/backup/preview"),HttpMethod.POST,new HttpEntity<>(previewForm,backupHeaders),String.class);assertThat(preview.getStatusCode()).isEqualTo(HttpStatus.OK);assertThat(preview.getBody()).contains("sha256Verified","totalRows");
+        ResponseEntity<String> restored=http.exchange(url("/api/v1/backup/restore"),HttpMethod.POST,new HttpEntity<>(previewForm,backupHeaders),String.class);assertThat(restored.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(http.exchange(url("/api/v1/companies"),HttpMethod.GET,new HttpEntity<>(ah),String.class).getBody()).contains("Private A");
         ResponseEntity<String> spoof=http.exchange(url("/api/v1/jobs"),HttpMethod.GET,new HttpEntity<>(headers("hc_workspace=fake",bCsrf)),String.class);
         assertThat(spoof.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
