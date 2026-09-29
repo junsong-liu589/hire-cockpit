@@ -28,6 +28,22 @@ test('independent browser workspaces cannot read or mutate each other', async ({
   await expect(pageA.getByText('全栈工程师')).toBeVisible()
   await pageA.locator('select').selectOption('面试中')
   await expect(pageA.locator('select')).toHaveValue('面试中')
+  const planning = await pageA.evaluate(async () => {
+    const token = decodeURIComponent(document.cookie.split('; ').find(c => c.startsWith('hc_csrf='))!.slice(8))
+    const dueAt = new Date(Date.now() + 60 * 60 * 1000).toISOString()
+    const task = await fetch('/api/v1/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': token }, body: JSON.stringify({ title: '提醒去重验收', taskType: '备材料', priority: 'A', dueAt, timeZone: 'Asia/Shanghai' }) })
+    const from = new Date(Date.now() - 60 * 60 * 1000).toISOString(), to = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString()
+    const calendar = await (await fetch(`/api/v1/calendar?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`)).json()
+    const first = await (await fetch('/api/v1/notifications')).json(), second = await (await fetch('/api/v1/notifications')).json()
+    return { task: task.status, calendar: calendar.some((e: { title: string }) => e.title === '提醒去重验收'), first: first.map((n: { id: string }) => n.id), second: second.map((n: { id: string }) => n.id) }
+  })
+  expect(planning.task).toBe(201)
+  expect(planning.calendar).toBe(true)
+  expect(planning.first).toHaveLength(1)
+  expect(planning.first).toEqual(planning.second)
+  await pageA.reload()
+  await pageA.getByRole('button', { name: '日程', exact: true }).click()
+  await expect(pageA.getByText('提醒去重验收')).toBeVisible()
   const owned = await pageA.evaluate(async () => ({
     apps: await (await fetch('/api/v1/applications')).json(),
     companies: await (await fetch('/api/v1/companies')).json()
@@ -44,11 +60,13 @@ test('independent browser workspaces cannot read or mutate each other', async ({
   const crossWorkspace = await pageB.evaluate(async ({ companyId, applicationId }) => {
     const headers = { 'Content-Type': 'application/json', 'X-CSRF-Token': decodeURIComponent(document.cookie.split('; ').find(c => c.startsWith('hc_csrf='))!.slice(8)) }
     const companyPost = await fetch('/api/v1/jobs', { method: 'POST', headers, body: JSON.stringify({ companyId, title: '越权岗位' }) })
+    const companyRead = await fetch(`/api/v1/companies/${companyId}`)
     const applicationGet = await fetch(`/api/v1/applications/${applicationId}/history`)
     const applicationMutation = await fetch(`/api/v1/applications/${applicationId}/status`, { method: 'PUT', headers, body: JSON.stringify({ status: '已拿 Offer', stage: 'OFFER' }) })
-    return { companyPost: companyPost.status, applicationGet: applicationGet.status, applicationMutation: applicationMutation.status }
+    return { companyPost: companyPost.status, companyRead: companyRead.status, applicationGet: applicationGet.status, applicationMutation: applicationMutation.status }
   }, { companyId: owned.companies[0].id, applicationId: owned.apps[0].id })
   expect(crossWorkspace.companyPost).toBe(404)
+  expect(crossWorkspace.companyRead).toBe(404)
   expect(crossWorkspace.applicationGet).toBe(404)
   expect(crossWorkspace.applicationMutation).toBe(404)
   await a.close(); await b.close()

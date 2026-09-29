@@ -2,6 +2,9 @@ package app.hirecockpit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import java.util.List;
+import java.time.*;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -39,6 +42,19 @@ class WorkspaceIsolationTest {
         assertThat(bCompanies.getBody()).doesNotContain("Private A");
         ResponseEntity<String> cross=http.exchange(url("/api/v1/jobs"),HttpMethod.POST,new HttpEntity<>("{\"companyId\":\""+companyId+"\",\"title\":\"Should not exist\"}",bh),String.class);
         assertThat(cross.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        ZoneId zone=ZoneId.of("Asia/Shanghai"); Instant due=LocalDate.now(zone).plusDays(1).atTime(22,0).atZone(zone).toInstant();
+        ResponseEntity<String> settings=http.exchange(url("/api/v1/settings/reminders"),HttpMethod.PUT,new HttpEntity<>("{\"days\":[1],\"timeZone\":\"Asia/Shanghai\"}",ah),String.class);
+        assertThat(settings.getStatusCode()).isEqualTo(HttpStatus.OK);
+        ResponseEntity<String> task=http.exchange(url("/api/v1/tasks"),HttpMethod.POST,new HttpEntity<>("{\"title\":\"Timezone task\",\"priority\":\"A\",\"timeZone\":\"Asia/Shanghai\",\"dueAt\":\""+due+"\"}",ah),String.class);
+        assertThat(task.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        String from=URLEncoder.encode(Instant.now().minusSeconds(60).toString(),StandardCharsets.UTF_8),to=URLEncoder.encode(due.plusSeconds(3600).toString(),StandardCharsets.UTF_8);
+        ResponseEntity<String> calendar=http.exchange(url("/api/v1/calendar?from="+from+"&to="+to),HttpMethod.GET,new HttpEntity<>(ah),String.class);
+        assertThat(calendar.getBody()).contains("Timezone task");
+        ResponseEntity<String> first=http.exchange(url("/api/v1/notifications"),HttpMethod.GET,new HttpEntity<>(ah),String.class);
+        ResponseEntity<String> second=http.exchange(url("/api/v1/notifications"),HttpMethod.GET,new HttpEntity<>(ah),String.class);
+        assertThat(first.getBody()).contains("Timezone task");assertThat(first.getBody()).isEqualTo(second.getBody());
+        ResponseEntity<String> bTasks=http.exchange(url("/api/v1/tasks"),HttpMethod.GET,new HttpEntity<>(bh),String.class);
+        assertThat(bTasks.getBody()).doesNotContain("Timezone task");
         ResponseEntity<String> spoof=http.exchange(url("/api/v1/jobs"),HttpMethod.GET,new HttpEntity<>(headers("hc_workspace=fake",bCsrf)),String.class);
         assertThat(spoof.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
