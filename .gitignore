@@ -1,0 +1,15 @@
+.env
+.env.*
+!.env.example
+**/target/
+**/node_modules/
+**/dist/
+**/.vite/
+**/playwright-report/
+**/test-results/
+data/
+uploads/
+backups/
+*.log
+.idea/
+.vscode/
