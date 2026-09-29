@@ -20,8 +20,8 @@ import org.springframework.web.server.ResponseStatusException;
 @RestController
 @RequestMapping("/api/v1/backup")
 public class BackupController {
-    private static final List<String> TABLES=List.of("company","job","resume_version","application","application_status_history","tag","job_tag","dictionary_item","workspace_setting","task","calendar_event","notification_event","stored_file","profile_entry","exam","interview","experience_note","offer","offer_comparison_preference");
-    private static final List<String> DELETE_ORDER=List.of("offer_comparison_preference","offer","experience_note","interview","exam","profile_entry","stored_file","notification_event","calendar_event","task","job_tag","tag","application_status_history","application","resume_version","job","company","dictionary_item","workspace_setting");
+    private static final List<String> TABLES=List.of("company","job","resume_version","application","application_status_history","tag","job_tag","dictionary_item","workspace_setting","task","calendar_event","notification_event","stored_file","profile_entry","exam","interview","experience_note","offer","offer_comparison_preference","collection_rule");
+    private static final List<String> DELETE_ORDER=List.of("collection_rule","offer_comparison_preference","offer","experience_note","interview","exam","profile_entry","stored_file","notification_event","calendar_event","task","job_tag","tag","application_status_history","application","resume_version","job","company","dictionary_item","workspace_setting");
     private static final long MAX_ARCHIVE=250L*1024*1024;
     private final JdbcTemplate db;private final ObjectMapper json;private final Path uploadRoot;
     public BackupController(JdbcTemplate db,ObjectMapper json,@Value("${app.upload-dir:./data/uploads}")String uploadDir){this.db=db;this.json=json;this.uploadRoot=Path.of(uploadDir).toAbsolutePath().normalize();}

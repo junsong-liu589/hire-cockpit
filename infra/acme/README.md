@@ -1,0 +1,1 @@
+This directory is mounted as the HTTP-01 ACME challenge root. Provision or renew certificates with your certificate tooling, then place `fullchain.pem` and `privkey.pem` under `infra/certs/` and restart the production proxy.

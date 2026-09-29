@@ -13,3 +13,7 @@ backups/
 *.log
 .idea/
 .vscode/
+infra/certs/*
+!infra/certs/README.md
+infra/acme/*
+!infra/acme/README.md

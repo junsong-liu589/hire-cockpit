@@ -9,7 +9,7 @@ Hire Cockpit is a Chinese-language job search workspace for tracking employers, 
 3. Run `docker compose up --build` from this folder.
 4. Open <http://localhost:8080>. The API health endpoint is `/actuator/health`.
 
-The first visit creates a workspace. Use Settings → Data to export a backup before moving browsers or clearing cookies. Restore previews the archive before replacing workspace data. Never upload real identity documents to a public demo.
+The first visit creates a workspace. Use Settings → Backup and restore to export a backup before moving browsers or clearing cookies. Restore previews the archive before replacing workspace data. Never upload real identity documents to a public demo.
 
 ## Local development
 
@@ -21,6 +21,6 @@ The first visit creates a workspace. Use Settings → Data to export a backup be
 
 ## Privacy and operations
 
-The workspace credential is an HttpOnly cookie; it is not the workspace ID. Backups contain personal data and uploaded files. Store them offline and protect them. Cookies are same-site and writes require a CSRF token. Uploads accept magic-checked PDF, PNG, JPEG, and Office documents up to 20 MiB. Production requires HTTPS (`COOKIE_SECURE=true`), a restricted DB user, persistent private volumes, encrypted backups, log redaction, and a retention policy. The included AI integration is optional; basic features work without an AI key.
+The workspace credential is an HttpOnly cookie; it is not the workspace ID. Backups contain personal data and uploaded files. Store them offline and protect them. Cookies are same-site and writes require a CSRF token. Uploads accept magic-checked PDF, PNG, JPEG, and Office documents up to 20 MiB. Production requires HTTPS (`COOKIE_SECURE=true`), a restricted DB user, persistent private volumes, encrypted backups, log redaction, and a retention policy. Core workflow and local keyword matching work without an AI key; this build does not make AI API calls.
 
 See [docs/ROADMAP.md](docs/ROADMAP.md), [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md), and [docs/SECURITY.md](docs/SECURITY.md).

@@ -31,6 +31,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: docker compose config
+      - run: docker compose --profile production config
       - run: docker compose up --build -d
       - run: for i in $(seq 1 60); do curl -fsS http://localhost:8080/actuator/health && exit 0; sleep 5; done; docker compose logs; exit 1
       - uses: actions/setup-node@v4

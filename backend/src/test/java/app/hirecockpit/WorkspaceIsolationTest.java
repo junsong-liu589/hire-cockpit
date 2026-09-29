@@ -39,6 +39,10 @@ class WorkspaceIsolationTest {
         assertThat(aCookie).isNotEqualTo(bCookie);
         String aCsrf = csrf(aBootstrap), bCsrf = csrf(bBootstrap);
         HttpHeaders ah = headers(aCookie,aCsrf), bh=headers(bCookie,bCsrf);
+        HttpHeaders missingCsrf=new HttpHeaders();missingCsrf.add(HttpHeaders.COOKIE,aCookie);missingCsrf.add(HttpHeaders.ORIGIN,"http://localhost:"+port);missingCsrf.setContentType(MediaType.APPLICATION_JSON);
+        assertThat(http.exchange(url("/api/v1/companies"),HttpMethod.POST,new HttpEntity<>("{\"name\":\"No CSRF\"}",missingCsrf),String.class).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        HttpHeaders wrongOrigin=headers(aCookie,aCsrf);wrongOrigin.set(HttpHeaders.ORIGIN,"https://attacker.example");
+        assertThat(http.exchange(url("/api/v1/companies"),HttpMethod.POST,new HttpEntity<>("{\"name\":\"Wrong origin\"}",wrongOrigin),String.class).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
         ResponseEntity<String> company = http.exchange(url("/api/v1/companies"),HttpMethod.POST,new HttpEntity<>("{\"name\":\"Private A\"}",ah),String.class);
         assertThat(company.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         String companyId = new com.fasterxml.jackson.databind.ObjectMapper().readTree(company.getBody()).get("id").asText();
@@ -103,6 +107,8 @@ class WorkspaceIsolationTest {
         ResponseEntity<String> preview=http.exchange(url("/api/v1/backup/preview"),HttpMethod.POST,new HttpEntity<>(previewForm,backupHeaders),String.class);assertThat(preview.getStatusCode()).isEqualTo(HttpStatus.OK);assertThat(preview.getBody()).contains("sha256Verified","totalRows");
         ResponseEntity<String> restored=http.exchange(url("/api/v1/backup/restore"),HttpMethod.POST,new HttpEntity<>(previewForm,backupHeaders),String.class);assertThat(restored.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(http.exchange(url("/api/v1/companies"),HttpMethod.GET,new HttpEntity<>(ah),String.class).getBody()).contains("Private A");
+        assertThat(http.exchange(url("/api/v1/companies"),HttpMethod.GET,new HttpEntity<>(bh),String.class).getBody()).doesNotContain("Private A");
+        assertThat(http.exchange(url("/api/v1/collection-rules"),HttpMethod.GET,new HttpEntity<>(ah),String.class).getBody()).contains("Backend roles");
         ResponseEntity<String> spoof=http.exchange(url("/api/v1/jobs"),HttpMethod.GET,new HttpEntity<>(headers("hc_workspace=fake",bCsrf)),String.class);
         assertThat(spoof.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }

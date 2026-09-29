@@ -16,6 +16,7 @@ RUN mvn -B package -DskipTests
 FROM eclipse-temurin:21-jre
 WORKDIR /app
 COPY --from=backend-build /src/target/hire-cockpit-*.jar app.jar
-COPY --from=frontend /web/dist ./static
+RUN mkdir -p /data/uploads /data/backups && chown -R 10001:10001 /app /data
+USER 10001:10001
 EXPOSE 8080
 ENTRYPOINT ["java","-XX:MaxRAMPercentage=75.0","-jar","/app/app.jar"]

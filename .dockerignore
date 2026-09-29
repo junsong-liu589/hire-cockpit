@@ -7,4 +7,6 @@ data
 uploads
 backups
 .env
+infra/certs
+infra/acme
 *.log
