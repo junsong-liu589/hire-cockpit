@@ -22,13 +22,24 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
       - run: npm install
-      - run: npm run typecheck && npm test && npm run build
+      - run: npm run lint && npm run typecheck && npm test && npm run build
   compose-smoke:
     runs-on: ubuntu-latest
+    env:
+      MYSQL_PASSWORD: ci-only-password
+      MYSQL_ROOT_PASSWORD: ci-only-root-password
     steps:
       - uses: actions/checkout@v4
       - run: docker compose config
       - run: docker compose up --build -d
       - run: for i in $(seq 1 60); do curl -fsS http://localhost:8080/actuator/health && exit 0; sleep 5; done; docker compose logs; exit 1
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm install
+        working-directory: frontend
+      - run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - run: npm run e2e
+        working-directory: frontend
       - if: always()
         run: docker compose down -v
