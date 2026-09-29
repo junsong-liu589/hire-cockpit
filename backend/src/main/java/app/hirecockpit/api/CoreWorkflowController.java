@@ -64,7 +64,7 @@ public class CoreWorkflowController {
         return db.queryForList("SELECT a.id,a.job_id AS jobId,j.title AS jobTitle,c.name AS companyName,a.resume_version_id AS resumeVersionId,a.applied_at AS appliedAt,a.channel,a.platform,a.platform_account AS platformAccount,a.referrer,a.notes,a.current_status AS status,a.current_stage AS stage,a.created_at AS createdAt FROM application a JOIN job j ON j.id=a.job_id AND j.workspace_id=a.workspace_id JOIN company c ON c.id=j.company_id AND c.workspace_id=j.workspace_id WHERE a.workspace_id=UUID_TO_BIN(?) AND a.deleted_at IS NULL ORDER BY a.updated_at DESC LIMIT 500",workspace(r));
     }
     @GetMapping("/resumes") public List<Map<String,Object>> resumes(HttpServletRequest r) {
-        return db.queryForList("SELECT id,name,direction,version,notes,created_at AS createdAt FROM resume_version WHERE workspace_id=UUID_TO_BIN(?) AND deleted_at IS NULL ORDER BY updated_at DESC",workspace(r));
+        return db.queryForList("SELECT id,name,direction,version,notes,stored_file_id AS storedFileId,created_at AS createdAt FROM resume_version WHERE workspace_id=UUID_TO_BIN(?) AND deleted_at IS NULL ORDER BY updated_at DESC",workspace(r));
     }
     @GetMapping("/dictionaries/{category}") public List<Map<String,Object>> dictionary(HttpServletRequest r,@PathVariable String category) {
         return db.queryForList("SELECT id,label,stable_stage AS stableStage,color FROM dictionary_item WHERE workspace_id=UUID_TO_BIN(?) AND category=? AND deleted_at IS NULL ORDER BY label",workspace(r),category);
@@ -91,7 +91,7 @@ public class CoreWorkflowController {
         return Map.of("jobId",id,"tagIds",ids);
     }
     @PostMapping("/resumes") @ResponseStatus(HttpStatus.CREATED) @Transactional public Map<String,Object> createResume(HttpServletRequest r,@Valid @RequestBody ResumeInput in) {
-        String w=workspace(r),id=UUID.randomUUID().toString(); db.update("INSERT INTO resume_version(id,workspace_id,name,direction,version,notes) VALUES (?,UUID_TO_BIN(?),?,?,?,?)",id,w,in.name(),in.direction(),in.version(),in.notes()); return Map.of("id",id,"name",in.name());
+        String w=workspace(r),id=UUID.randomUUID().toString();if(in.storedFileId()!=null&&db.queryForObject("SELECT COUNT(*) FROM stored_file WHERE id=? AND workspace_id=UUID_TO_BIN(?) AND deleted_at IS NULL",Integer.class,in.storedFileId(),w)==0)throw new ResponseStatusException(HttpStatus.NOT_FOUND,"File not found"); db.update("INSERT INTO resume_version(id,workspace_id,name,direction,version,notes,stored_file_id) VALUES (?,UUID_TO_BIN(?),?,?,?,?,?)",id,w,in.name(),in.direction(),in.version(),in.notes(),in.storedFileId()); return Map.of("id",id,"name",in.name());
     }
     @GetMapping("/applications/{id}") public Map<String,Object> application(HttpServletRequest r,@PathVariable String id) {
         return one("SELECT a.id,a.job_id AS jobId,j.title AS jobTitle,c.name AS companyName,a.resume_version_id AS resumeVersionId,a.applied_at AS appliedAt,a.channel,a.platform,a.platform_account AS platformAccount,a.referrer,a.notes,a.current_status AS status,a.current_stage AS stage FROM application a JOIN job j ON j.id=a.job_id AND j.workspace_id=a.workspace_id JOIN company c ON c.id=j.company_id AND c.workspace_id=j.workspace_id WHERE a.id=? AND a.workspace_id=UUID_TO_BIN(?) AND a.deleted_at IS NULL",id,workspace(r));
@@ -131,7 +131,7 @@ public class CoreWorkflowController {
     public record CompanyInput(@NotBlank String name,String shortName,String groupName,String nature,String industry,String region,String website,String recruitmentWebsite,String description,String notes) {}
     public record JobInput(@NotBlank String companyId,@NotBlank String title,String department,String jobNumber,String recruitmentType,String batch,String city,String degreeRequirement,String majorRequirement,String skillRequirement,String salary,LocalDate deadline,String sourceUrl,String originalText,String notes,boolean favorite,String priority) {}
     public record ApplicationInput(@NotBlank String jobId,String resumeVersionId,Instant appliedAt,String channel,String platform,String platformAccount,String referrer,String notes,String status,String stage) {}
-    public record ResumeInput(@NotBlank String name,String direction,String version,String notes) {}
+    public record ResumeInput(@NotBlank String name,String direction,String version,String notes,String storedFileId) {}
     public record DictionaryInput(@NotBlank String label,String stableStage,String color) {}
     public record TagInput(@NotBlank String name,String category,String color) {}
     public record TagAssignment(List<String> tagIds) {}

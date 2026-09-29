@@ -14,12 +14,13 @@ The first visit creates a workspace. Use Settings → Data to export a backup be
 ## Local development
 
 - Backend: Java 21 and Maven 3.9+, then `cd backend && mvn spring-boot:run`.
-- Frontend: Node.js 20+, then `cd frontend && npm ci && npm run dev`.
+- Frontend: Node.js 20+, then `cd frontend && npm install && npm run dev`.
 - Set `DB_URL`, `DB_USERNAME`, and `DB_PASSWORD` to a MySQL 8.4 database. Flyway applies versioned migrations; startup does not recreate tables.
+- Generate a 32-byte profile-data key with `openssl rand -base64 32` and set `APP_ENCRYPTION_KEY` before storing personal profile records. Keep it separate from database backups; losing it makes encrypted fields unreadable.
 - Set `VITE_API_BASE_URL=http://localhost:8080/api/v1` when running Vite separately.
 
 ## Privacy and operations
 
-The workspace credential is an HttpOnly cookie; it is not the workspace ID. Backups contain personal data and uploaded files. Store them offline and protect them. Cookies are same-site and writes require a CSRF token. Production requires HTTPS (`COOKIE_SECURE=true`), a restricted DB user, persistent private volumes, encrypted backups, log redaction, and a retention policy. The included AI integration is optional; basic features work without an AI key.
+The workspace credential is an HttpOnly cookie; it is not the workspace ID. Backups contain personal data and uploaded files. Store them offline and protect them. Cookies are same-site and writes require a CSRF token. Uploads accept magic-checked PDF, PNG, JPEG, and Office documents up to 20 MiB. Production requires HTTPS (`COOKIE_SECURE=true`), a restricted DB user, persistent private volumes, encrypted backups, log redaction, and a retention policy. The included AI integration is optional; basic features work without an AI key.
 
 See [docs/ROADMAP.md](docs/ROADMAP.md), [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md), and [docs/SECURITY.md](docs/SECURITY.md).

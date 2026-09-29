@@ -7,10 +7,13 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.*;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.MySQLContainer;
@@ -22,10 +25,11 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 class WorkspaceIsolationTest {
     @Container static final MySQLContainer<?> mysql = new MySQLContainer<>("mysql:8.4");
     @DynamicPropertySource static void database(DynamicPropertyRegistry r) {
-        r.add("spring.datasource.url", mysql::getJdbcUrl); r.add("spring.datasource.username", mysql::getUsername); r.add("spring.datasource.password", mysql::getPassword);
+        r.add("spring.datasource.url", mysql::getJdbcUrl); r.add("spring.datasource.username", mysql::getUsername); r.add("spring.datasource.password", mysql::getPassword);r.add("app.encryption-key",()->Base64.getEncoder().encodeToString(new byte[32]));
     }
     @LocalServerPort int port;
     @Autowired TestRestTemplate http;
+    @Autowired JdbcTemplate jdbc;
 
     @Test void browserCredentialsAreIsolatedAndCrossWorkspaceAssociationsFail() throws Exception {
         HttpHeaders empty = new HttpHeaders();
@@ -38,6 +42,10 @@ class WorkspaceIsolationTest {
         ResponseEntity<String> company = http.exchange(url("/api/v1/companies"),HttpMethod.POST,new HttpEntity<>("{\"name\":\"Private A\"}",ah),String.class);
         assertThat(company.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         String companyId = new com.fasterxml.jackson.databind.ObjectMapper().readTree(company.getBody()).get("id").asText();
+        ResponseEntity<String> job=http.exchange(url("/api/v1/jobs"),HttpMethod.POST,new HttpEntity<>("{\"companyId\":\""+companyId+"\",\"title\":\"Backend role\"}",ah),String.class);
+        String jobId=new com.fasterxml.jackson.databind.ObjectMapper().readTree(job.getBody()).get("id").asText();
+        ResponseEntity<String> application=http.exchange(url("/api/v1/applications"),HttpMethod.POST,new HttpEntity<>("{\"jobId\":\""+jobId+"\"}",ah),String.class);
+        String applicationId=new com.fasterxml.jackson.databind.ObjectMapper().readTree(application.getBody()).get("id").asText();
         ResponseEntity<String> bCompanies=http.exchange(url("/api/v1/companies"),HttpMethod.GET,new HttpEntity<>(bh),String.class);
         assertThat(bCompanies.getBody()).doesNotContain("Private A");
         ResponseEntity<String> cross=http.exchange(url("/api/v1/jobs"),HttpMethod.POST,new HttpEntity<>("{\"companyId\":\""+companyId+"\",\"title\":\"Should not exist\"}",bh),String.class);
@@ -53,8 +61,28 @@ class WorkspaceIsolationTest {
         ResponseEntity<String> first=http.exchange(url("/api/v1/notifications"),HttpMethod.GET,new HttpEntity<>(ah),String.class);
         ResponseEntity<String> second=http.exchange(url("/api/v1/notifications"),HttpMethod.GET,new HttpEntity<>(ah),String.class);
         assertThat(first.getBody()).contains("Timezone task");assertThat(first.getBody()).isEqualTo(second.getBody());
+        Instant interviewAt=Instant.now().plusSeconds(90*60L);
+        ResponseEntity<String> interview=http.exchange(url("/api/v1/interviews"),HttpMethod.POST,new HttpEntity<>("{\"applicationId\":\""+applicationId+"\",\"roundName\":\"一面\",\"startsAt\":\""+interviewAt+"\",\"timeZone\":\"Asia/Shanghai\",\"rating\":8}",ah),String.class);
+        assertThat(interview.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        ResponseEntity<String> scheduled=http.exchange(url("/api/v1/calendar?from="+URLEncoder.encode(Instant.now().minusSeconds(60).toString(),StandardCharsets.UTF_8)+"&to="+URLEncoder.encode(interviewAt.plusSeconds(3600).toString(),StandardCharsets.UTF_8)),HttpMethod.GET,new HttpEntity<>(ah),String.class);
+        assertThat(scheduled.getBody()).contains("一面");
         ResponseEntity<String> bTasks=http.exchange(url("/api/v1/tasks"),HttpMethod.GET,new HttpEntity<>(bh),String.class);
         assertThat(bTasks.getBody()).doesNotContain("Timezone task");
+        String workspaceId=new com.fasterxml.jackson.databind.ObjectMapper().readTree(aBootstrap.getBody()).get("workspaceId").asText();
+        ResponseEntity<String> profile=http.exchange(url("/api/v1/profiles/personal"),HttpMethod.POST,new HttpEntity<>("{\"title\":\"基本信息\",\"fields\":{\"姓名\":\"敏感姓名\",\"手机号\":\"13800000000\"},\"visibleFields\":[\"姓名\"]}",ah),String.class);
+        assertThat(profile.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        ResponseEntity<String> bProfile=http.exchange(url("/api/v1/profiles/personal"),HttpMethod.GET,new HttpEntity<>(bh),String.class);assertThat(bProfile.getBody()).doesNotContain("敏感姓名");
+        byte[] encrypted=jdbc.queryForObject("SELECT encrypted_payload FROM profile_entry WHERE workspace_id=UUID_TO_BIN(?)",byte[].class,workspaceId);assertThat(new String(encrypted,StandardCharsets.UTF_8)).doesNotContain("敏感姓名");
+        HttpHeaders multipartHeaders=headers(aCookie,aCsrf);multipartHeaders.setContentType(MediaType.MULTIPART_FORM_DATA);
+        LinkedMultiValueMap<String,Object> form=new LinkedMultiValueMap<>();form.add("file",new ByteArrayResource("%PDF-1.4\nprofile".getBytes(StandardCharsets.US_ASCII)){@Override public String getFilename(){return "../../resume.pdf";}});
+        ResponseEntity<String> upload=http.exchange(url("/api/v1/files"),HttpMethod.POST,new HttpEntity<>(form,multipartHeaders),String.class);
+        assertThat(upload.getStatusCode()).isEqualTo(HttpStatus.CREATED);String fileId=new com.fasterxml.jackson.databind.ObjectMapper().readTree(upload.getBody()).get("id").asText();
+        LinkedMultiValueMap<String,Object> invalidForm=new LinkedMultiValueMap<>();invalidForm.add("file",new ByteArrayResource("<script>alert(1)</script>".getBytes(StandardCharsets.UTF_8)){@Override public String getFilename(){return "malicious.pdf";}});
+        ResponseEntity<String> rejectedUpload=http.exchange(url("/api/v1/files"),HttpMethod.POST,new HttpEntity<>(invalidForm,multipartHeaders),String.class);assertThat(rejectedUpload.getStatusCode()).isEqualTo(HttpStatus.UNSUPPORTED_MEDIA_TYPE);
+        ResponseEntity<String> privateDownload=http.exchange(url("/api/v1/files/"+fileId+"/download"),HttpMethod.GET,new HttpEntity<>(bh),String.class);
+        assertThat(privateDownload.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        ResponseEntity<byte[]> ownDownload=http.exchange(url("/api/v1/files/"+fileId+"/download"),HttpMethod.GET,new HttpEntity<>(ah),byte[].class);
+        assertThat(ownDownload.getStatusCode()).isEqualTo(HttpStatus.OK);assertThat(ownDownload.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION)).contains("resume.pdf");
         ResponseEntity<String> spoof=http.exchange(url("/api/v1/jobs"),HttpMethod.GET,new HttpEntity<>(headers("hc_workspace=fake",bCsrf)),String.class);
         assertThat(spoof.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }

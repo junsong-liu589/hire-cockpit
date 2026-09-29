@@ -27,3 +27,4 @@ app:
   cookie-max-age-days: ${WORKSPACE_COOKIE_MAX_AGE_DAYS:365}
   upload-dir: ${UPLOAD_DIR:./data/uploads}
   backup-dir: ${BACKUP_DIR:./data/backups}
+  encryption-key: ${APP_ENCRYPTION_KEY:}

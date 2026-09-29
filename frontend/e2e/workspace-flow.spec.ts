@@ -18,6 +18,8 @@ test('independent browser workspaces cannot read or mutate each other', async ({
   await pageA.getByRole('button', { name: '简历与材料', exact: true }).click()
   await pageA.getByRole('button', { name: '添加简历版本' }).click()
   await pageA.getByLabel('版本名称').fill('后端研发校招版')
+  await pageA.getByLabel('简历附件').setInputFiles({ name: 'resume.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\nworkspace A resume') })
+  await expect(pageA.getByText('附件已上传并绑定到版本')).toBeVisible()
   await pageA.getByRole('button', { name: '保存版本' }).click()
   await expect(pageA.getByText('后端研发校招版')).toBeVisible()
   await pageA.getByRole('button', { name: '投递', exact: true }).click()
@@ -41,12 +43,26 @@ test('independent browser workspaces cannot read or mutate each other', async ({
   expect(planning.calendar).toBe(true)
   expect(planning.first).toHaveLength(1)
   expect(planning.first).toEqual(planning.second)
+  const interviewCheck = await pageA.evaluate(async () => {
+    const token = decodeURIComponent(document.cookie.split('; ').find(c => c.startsWith('hc_csrf='))!.slice(8))
+    const apps = await (await fetch('/api/v1/applications')).json()
+    const startsAt = new Date(Date.now() + 90 * 60 * 1000).toISOString()
+    const response = await fetch('/api/v1/interviews', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': token }, body: JSON.stringify({ applicationId: apps[0].id, roundName: '一面', startsAt, timeZone: 'Asia/Shanghai', modality: '视频', rating: 8, questionNotes: [] }) })
+    const calendar = await (await fetch(`/api/v1/calendar?from=${encodeURIComponent(new Date().toISOString())}&to=${encodeURIComponent(new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString())}`)).json()
+    const notices = await (await fetch('/api/v1/notifications')).json()
+    return { saved: response.status, inCalendar: calendar.some((e: { title: string }) => e.title === '一面'), hasReminder: notices.some((n: { title: string }) => n.title.includes('一面')) }
+  })
+  expect(interviewCheck.saved).toBe(201)
+  expect(interviewCheck.inCalendar).toBe(true)
+  expect(interviewCheck.hasReminder).toBe(true)
   await pageA.reload()
   await pageA.getByRole('button', { name: '日程', exact: true }).click()
   await expect(pageA.getByText('提醒去重验收')).toBeVisible()
+  await expect(pageA.getByText('一面')).toBeVisible()
   const owned = await pageA.evaluate(async () => ({
     apps: await (await fetch('/api/v1/applications')).json(),
-    companies: await (await fetch('/api/v1/companies')).json()
+    companies: await (await fetch('/api/v1/companies')).json(),
+    resumes: await (await fetch('/api/v1/resumes')).json()
   }))
   expect(owned.apps).toHaveLength(1)
   await pageA.reload()
@@ -57,16 +73,18 @@ test('independent browser workspaces cannot read or mutate each other', async ({
   await pageB.goto('/'); await expect(pageB.getByText('仅此浏览器可继续使用')).toBeVisible()
   await pageB.getByRole('button', { name: '企业', exact: true }).click()
   await expect(pageB.getByText('尚无企业记录')).toBeVisible()
-  const crossWorkspace = await pageB.evaluate(async ({ companyId, applicationId }) => {
+  const crossWorkspace = await pageB.evaluate(async ({ companyId, applicationId, fileId }) => {
     const headers = { 'Content-Type': 'application/json', 'X-CSRF-Token': decodeURIComponent(document.cookie.split('; ').find(c => c.startsWith('hc_csrf='))!.slice(8)) }
     const companyPost = await fetch('/api/v1/jobs', { method: 'POST', headers, body: JSON.stringify({ companyId, title: '越权岗位' }) })
     const companyRead = await fetch(`/api/v1/companies/${companyId}`)
+    const fileRead = await fetch(`/api/v1/files/${fileId}/download`)
     const applicationGet = await fetch(`/api/v1/applications/${applicationId}/history`)
     const applicationMutation = await fetch(`/api/v1/applications/${applicationId}/status`, { method: 'PUT', headers, body: JSON.stringify({ status: '已拿 Offer', stage: 'OFFER' }) })
-    return { companyPost: companyPost.status, companyRead: companyRead.status, applicationGet: applicationGet.status, applicationMutation: applicationMutation.status }
-  }, { companyId: owned.companies[0].id, applicationId: owned.apps[0].id })
+    return { companyPost: companyPost.status, companyRead: companyRead.status, fileRead: fileRead.status, applicationGet: applicationGet.status, applicationMutation: applicationMutation.status }
+  }, { companyId: owned.companies[0].id, applicationId: owned.apps[0].id, fileId: owned.resumes[0].storedFileId })
   expect(crossWorkspace.companyPost).toBe(404)
   expect(crossWorkspace.companyRead).toBe(404)
+  expect(crossWorkspace.fileRead).toBe(404)
   expect(crossWorkspace.applicationGet).toBe(404)
   expect(crossWorkspace.applicationMutation).toBe(404)
   await a.close(); await b.close()
