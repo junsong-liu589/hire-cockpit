@@ -69,6 +69,11 @@ test('independent browser workspaces cannot read or mutate each other', async ({
   await expect(pageA.getByText('仅此浏览器可继续使用')).toBeVisible()
   await pageA.getByRole('button', { name: '企业', exact: true }).click()
   await expect(pageA.getByText('隔离验收企业')).toBeVisible()
+  await pageA.getByRole('button', { name: '招聘链接采集', exact: true }).click()
+  await pageA.getByPlaceholder('https://careers.example.com/job/...').fill('http://127.0.0.1:8080/actuator/health')
+  await pageA.getByRole('button', { name: '读取并生成可编辑草稿' }).click()
+  await expect(pageA.getByText('Only public HTTP/HTTPS recruitment URLs on standard ports are allowed')).toBeVisible()
+  expect(await pageA.evaluate(async () => (await (await fetch('/api/v1/jobs')).json()).length)).toBe(1)
 
   await pageB.goto('/'); await expect(pageB.getByText('仅此浏览器可继续使用')).toBeVisible()
   await pageB.getByRole('button', { name: '企业', exact: true }).click()

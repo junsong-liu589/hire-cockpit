@@ -76,6 +76,11 @@ class WorkspaceIsolationTest {
         assertThat(crossOffer.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         ResponseEntity<String> analytics=http.exchange(url("/api/v1/analytics"),HttpMethod.GET,new HttpEntity<>(ah),String.class);
         assertThat(analytics.getBody()).contains("APPLICATION","OFFER","monthlyApplications");
+        ResponseEntity<String> rule=http.exchange(url("/api/v1/collection-rules"),HttpMethod.POST,new HttpEntity<>("{\"name\":\"Backend roles\",\"keywords\":[\"backend\",\"java\"],\"weight\":2.5,\"active\":true}",ah),String.class);
+        assertThat(rule.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        ResponseEntity<String> matches=http.exchange(url("/api/v1/job-matches"),HttpMethod.GET,new HttpEntity<>(ah),String.class);assertThat(matches.getBody()).contains("Backend role","Backend roles","matchScore");
+        ResponseEntity<String> bRules=http.exchange(url("/api/v1/collection-rules"),HttpMethod.GET,new HttpEntity<>(bh),String.class);assertThat(bRules.getBody()).doesNotContain("Backend roles");
+        ResponseEntity<String> blockedUrl=http.exchange(url("/api/v1/recruitment-drafts"),HttpMethod.POST,new HttpEntity<>("{\"url\":\"http://127.0.0.1:8080/actuator/health\"}",ah),String.class);assertThat(blockedUrl.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         ResponseEntity<String> bTasks=http.exchange(url("/api/v1/tasks"),HttpMethod.GET,new HttpEntity<>(bh),String.class);
         assertThat(bTasks.getBody()).doesNotContain("Timezone task");
         String workspaceId=new com.fasterxml.jackson.databind.ObjectMapper().readTree(aBootstrap.getBody()).get("workspaceId").asText();
