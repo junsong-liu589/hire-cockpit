@@ -1,5 +1,28 @@
 # Delivery roadmap
 
+## PWA product direction (2026-09-30)
+
+The user selected an installable, free-to-host PWA after clarifying that each roommate can keep an independent data set. This supersedes the earlier default Docker-first end-user path. The backend, migrations, Compose stack, and existing S0–S7 implementation remain in the repository as legacy/developer architecture; they are not required by the static PWA. The PWA's business API is implemented by a browser-side IndexedDB adapter and makes no business-data network requests. Browser storage is origin/profile/device-local, not an account or sync service.
+
+| PWA delivery item | Status | Evidence / limitation |
+| --- | --- | --- |
+| Static offline-capable application | Implemented and offline cold-start verified | Web manifest with 192/512 icons, scoped worker precaches app entry, manifest, icons and hashed JS/CSS; root/project Pages base support and Pages workflow. Edge Chromium at the Pages-style subpath registered an active worker; after network was disabled, a fresh navigation rendered the complete app shell. Native install-prompt coverage is pending. |
+| Local persistence and per-user separation | Implemented in code; partial runtime verified | IndexedDB records/settings; no API proxy or backend calls. In-browser acceptance created an enterprise, job and application and confirmed they remained after reload. Playwright covers independent contexts and reload; automated run pending. StorageManager persistence request/estimate added; browser may deny durable-storage request. |
+| Full hiring workflow | Implemented in code | Local adapter supports enterprises → jobs → applications/status history → exams/interviews/calendar/tasks → offers/comparison → analytics, profiles, resumes/files, keyword matching and reminders. PWA TypeScript/build checks passed. End-to-end runtime acceptance pending. |
+| Export, restore, and user instructions | Implemented in code/docs | Versioned JSON export/preview/restore includes file data, validates row/file allowlist and bounds, requires explicit confirmation; dedicated [PWA user guide](PWA-USER-GUIDE.md) covers persistence, backups, restore, and privacy. End-to-end restore test added, browser execution pending. |
+| Recruitment drafts / no-AI mode | Implemented with browser limits | No AI key needed for business basics or keyword matching. Draft creation explains CORS and asks for manually copied content; explicit review/confirmation required before a job is saved. Background notifications while app is closed are not promised. |
+| Free hosted link | Workflow prepared; external activation pending | Pages workflow builds `/hire-cockpit/` and deploys on main. Repository Settings → Pages must be set to GitHub Actions and free Pages requires a public repository. No public URL/deployment is claimed until GitHub accepts the workflow. |
+
+### PWA verification update
+
+- `docker compose build --pull=false`: passed after fixes; the production frontend bundle and Java package build. Vite reports the existing all-in-one Element Plus/ECharts bundle is over 500 kB.
+- `npm run typecheck` in the frontend build image: passed.
+- `npm run lint`: exit 0 with 1,237 warnings (mostly existing explicit `any` and unused-variable findings); no lint errors remain. The existing codebase contains significant lint debt.
+- `npm test`: passed, 2 workflow unit tests. Vitest collection is restricted to `src/**/*.test.ts`, separate from Playwright E2E.
+- New Playwright acceptance exercises standalone manifest/icon requirements, worker activation/offline navigation, two-context separation, enterprise/job/resume/file/application/interview/offer/analytics/task flow, reload persistence, JSON export/import, and non-persisted recruitment draft. The full Playwright suite is configured for Chromium CI but has not run locally; Edge manual offline and core reload checks passed.
+- Edge Chromium manually verified an active service worker, complete project-path precache, and successful fresh navigation after emulating a disconnected network. The automated Chromium E2E suite (including two-context isolation, restore, and recruitment-draft gates), native install prompt, GitHub Actions, GitHub Pages settings, fixed public URL, and public deployment remain pending; they are not claimed complete.
+- PWA source and documentation are committed in `fdef476` (`feat: ship local-first hiring cockpit PWA`). Two `git push origin main` attempts failed with `Recv failure: Connection was reset`; GitHub Actions was therefore not triggered, and no remote deployment is claimed.
+
 Status is based on executable evidence. A source file or UI mock alone does not close an acceptance item.
 
 | Stage | Status | Evidence / limitation |

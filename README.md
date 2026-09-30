@@ -1,26 +1,49 @@
-# Hire Cockpit
+# Hire Cockpit 求职驾驶舱
 
-Hire Cockpit is a Chinese-language job search workspace for tracking employers, jobs, applications, interviews, offers, and decisions. Each browser receives an anonymous private workspace. Clearing that browser's cookies loses access unless the user first exports a backup. There is no account recovery in this version.
+Hire Cockpit 是一个可安装的本地优先 PWA。舍友打开发布网址即可使用，不用安装 Docker、配置数据库或申请 AI 密钥。添加的企业、岗位、投递、笔面试、Offer、日程、附件和个人资料只写入各自设备浏览器的 IndexedDB，不会上传给本项目服务器，也不会自动跨设备同步。
 
-## Start with Docker Desktop
+## 使用者如何打开
 
-1. Install Docker Desktop with Compose v2 and Java 21 for local development.
-2. Copy `.env.example` to `.env` and replace the local database passwords.
-3. Run `docker compose up --build` from this folder.
-4. Open <http://localhost:8080>. The API health endpoint is `/actuator/health`.
+发布完成后，在电脑或手机浏览器打开仓库的 GitHub Pages 地址；浏览器支持时，可选择“安装应用”或“添加到主屏幕”。初次加载后应用外壳可离线打开。请优先使用 Chrome、Edge、Safari 或 Firefox 的最新版。保存、导出和恢复方式请看[使用手册](docs/PWA-USER-GUIDE.md)。
 
-The first visit creates a workspace. Use Settings → Backup and restore to export a backup before moving browsers or clearing cookies. Restore previews the archive before replacing workspace data. Never upload real identity documents to a public demo.
+## 免费发布到 GitHub Pages
 
-## Local development
+仓库管理员需要将 GitHub Pages 来源设为 **GitHub Actions**，并确认仓库满足 GitHub Free 的 Pages 方案要求。向 `main` 推送后，`.github/workflows/pages.yml` 会构建静态 PWA 并发布；完成后 GitHub Pages 会显示固定 HTTPS 地址。将该地址发给舍友即可。应用程序源代码会公开；求职记录和附件不在代码仓库，仍留在各自浏览器本地。
 
-- Backend: Java 21 and Maven 3.9+, then `cd backend && mvn spring-boot:run`.
-- Frontend: Node.js 20+, then `cd frontend && npm install && npm run dev`.
-- Set `DB_URL`, `DB_USERNAME`, and `DB_PASSWORD` to a MySQL 8.4 database. Flyway applies versioned migrations; startup does not recreate tables.
-- Generate a 32-byte profile-data key with `openssl rand -base64 32` and set `APP_ENCRYPTION_KEY` before storing personal profile records. Keep it separate from database backups; losing it makes encrypted fields unreadable.
-- Set `VITE_API_BASE_URL=http://localhost:8080/api/v1` when running Vite separately.
+首次发布需要仓库管理员在 GitHub 仓库 Settings → Pages 允许 GitHub Actions 发布；仅有本地提交不能替管理员修改 GitHub 仓库设置。
 
-## Privacy and operations
+## 本地开发
 
-The workspace credential is an HttpOnly cookie; it is not the workspace ID. Backups contain personal data and uploaded files. Store them offline and protect them. Cookies are same-site and writes require a CSRF token. Uploads accept magic-checked PDF, PNG, JPEG, and Office documents up to 20 MiB. Production requires HTTPS (`COOKIE_SECURE=true`), a restricted DB user, persistent private volumes, encrypted backups, log redaction, and a retention policy. Core workflow and local keyword matching work without an AI key; this build does not make AI API calls.
+```powershell
+cd frontend
+npm install
+npm run dev
+```
 
-See [docs/ROADMAP.md](docs/ROADMAP.md), [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md), and [docs/SECURITY.md](docs/SECURITY.md).
+验证命令：
+
+```powershell
+npm run lint
+npm run typecheck
+npm test
+npm run build
+npx playwright install chromium
+npm run e2e
+```
+
+后端和 Docker Compose 保留为开发/旧服务端架构，不是 PWA 使用者的前置条件。当前静态 PWA 的业务写入不调用后端 API。静态网页无法绕过招聘网站的跨域限制，因此招聘链接流程会提示用户复制职位内容并生成草稿，仍需人工确认才会入库。提醒会在打开应用时更新；应用关闭期间不保证后台推送。
+
+## 数据边界
+
+浏览器配置文件相互隔离；更换设备、浏览器或配置文件不会自动带上原数据。浏览器清除网站数据可能删除记录。IndexedDB 不是云备份，持久存储申请也不能替代定期导出。每位使用者应在“设置 → 备份与恢复”导出 JSON，并自行另存到其他安全位置。备份可能含简历和个人信息，请勿公开分享。
+
+本地业务数据没有服务器端账号或加密。请使用受密码保护的个人设备；共享电脑不要填写不愿被该电脑其他用户读取的敏感信息。
+
+## 项目结构与资料
+
+- `frontend/`：Vue PWA、IndexedDB 数据层、离线缓存与浏览器端端到端验收。
+- `backend/`、`db/`、`infra/`、`compose.yaml`：既有服务端部署/开发路线保留；PWA 使用不依赖它们。
+- [阶段路线图和验证证据](docs/ROADMAP.md)
+- [PWA 使用手册](docs/PWA-USER-GUIDE.md)
+- [发布说明](docs/DEPLOYMENT.md)
+- [安全说明](docs/SECURITY.md)
