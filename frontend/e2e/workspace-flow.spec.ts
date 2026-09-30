@@ -86,10 +86,11 @@ test('PWA keeps a complete hiring flow in one browser and isolates another brows
   await pageA.getByRole('button', { name: '添加面试' }).click()
   await openSelect(pageA, '投递')
   await pageA.getByText(/本地验收企业 · 浏览器本地工程师/).last().click()
-  await pageA.getByLabel('轮次').fill('一面')
+  const interviewDialog = pageA.getByRole('dialog', { name: '添加面试轮次' })
+  await interviewDialog.getByLabel('轮次').fill('一面')
   const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000)
   await pageA.getByLabel('时间').fill(`${tomorrow.getFullYear()}-${String(tomorrow.getMonth()+1).padStart(2,'0')}-${String(tomorrow.getDate()).padStart(2,'0')}T10:00:00`)
-  await pageA.getByRole('button', { name: '保存面试' }).click()
+  await interviewDialog.getByRole('button', { name: '保存面试' }).click()
   await expect(pageA.getByText('一面')).toBeVisible()
 
   await pageA.getByRole('button', { name: 'Offer', exact: true }).click()
