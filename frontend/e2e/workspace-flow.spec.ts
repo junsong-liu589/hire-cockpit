@@ -5,6 +5,9 @@ async function openSelect(page: Page, label: string) {
 }
 
 test('production PWA manifest, service worker and offline shell', async ({ page, context }) => {
+  const pageErrors: string[] = []
+  page.on('pageerror', error => pageErrors.push(error.message))
+  page.on('console', message => { if (message.type() === 'error') pageErrors.push(message.text()) })
   await page.goto('/')
   await page.evaluate(() => navigator.serviceWorker.ready)
   const pwa = await page.evaluate(async () => {
@@ -27,11 +30,12 @@ test('production PWA manifest, service worker and offline shell', async ({ page,
   } catch (error) {
     const diagnostics = await page.evaluate(async () => ({
       controller: Boolean(navigator.serviceWorker.controller),
-      cacheKeys: await caches.keys(),
+      cacheEntries: await Promise.all((await caches.keys()).map(async key => ({ key, urls: (await (await caches.open(key)).keys()).map(request => new URL(request.url).pathname) }))),
+      scripts: Array.from(document.scripts, script => script.src),
       appText: document.querySelector('#app')?.innerText,
       appMarkup: document.querySelector('#app')?.innerHTML.slice(0, 400),
     }))
-    throw new Error(`Offline app shell did not render: ${JSON.stringify(diagnostics)}; ${String(error)}`)
+    throw new Error(`Offline app shell did not render: ${JSON.stringify({ ...diagnostics, pageErrors })}; ${String(error)}`)
   }
   await expect(page.getByRole('button', { name: /企业$/ })).toBeVisible()
 })
@@ -59,7 +63,7 @@ test('PWA keeps a complete hiring flow in one browser and isolates another brows
   await pageA.getByRole('button', { name: '简历与材料', exact: true }).click()
   await pageA.getByRole('button', { name: '添加简历版本' }).click()
   await pageA.getByLabel('版本名称').fill('本地简历版本')
-  await pageA.getByLabel('简历附件').setInputFiles({ name: 'resume.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\nlocal PWA acceptance') })
+  await pageA.locator('input[type="file"][aria-label="简历附件"]').setInputFiles({ name: 'resume.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\nlocal PWA acceptance') })
   await expect(pageA.getByText('附件已上传并绑定到版本')).toBeVisible()
   await pageA.getByRole('button', { name: '保存版本' }).click()
   await expect(pageA.getByText('本地简历版本')).toBeVisible()
