@@ -4,8 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.List;
 import java.util.Base64;
 import java.time.*;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -60,7 +58,7 @@ class WorkspaceIsolationTest {
         assertThat(settings.getStatusCode()).isEqualTo(HttpStatus.OK);
         ResponseEntity<String> task=http.exchange(url("/api/v1/tasks"),HttpMethod.POST,new HttpEntity<>("{\"title\":\"Timezone task\",\"priority\":\"A\",\"timeZone\":\"Asia/Shanghai\",\"dueAt\":\""+due+"\"}",ah),String.class);
         assertThat(task.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-        String from=URLEncoder.encode(Instant.now().minusSeconds(60).toString(),StandardCharsets.UTF_8),to=URLEncoder.encode(due.plusSeconds(3600).toString(),StandardCharsets.UTF_8);
+        String from=Instant.now().minusSeconds(60).toString(),to=due.plusSeconds(3600).toString();
         ResponseEntity<String> calendar=http.exchange(url("/api/v1/calendar?from="+from+"&to="+to),HttpMethod.GET,new HttpEntity<>(ah),String.class);
         assertThat(calendar.getBody()).contains("Timezone task");
         ResponseEntity<String> first=http.exchange(url("/api/v1/notifications"),HttpMethod.GET,new HttpEntity<>(ah),String.class);

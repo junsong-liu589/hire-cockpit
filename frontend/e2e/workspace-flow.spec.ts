@@ -1,4 +1,8 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
+
+async function openSelect(page: Page, label: string) {
+  await page.locator('.el-form-item').filter({ hasText: label }).locator('.el-select__wrapper').click()
+}
 
 test('production PWA manifest, service worker and offline shell', async ({ page, context }) => {
   await page.goto('/')
@@ -17,7 +21,18 @@ test('production PWA manifest, service worker and offline shell', async ({ page,
   await expect.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true)
   await context.setOffline(true)
   await page.reload()
-  await expect(page.getByRole('heading', { name: '早上好，准备好开启新的一天了吗？' })).toBeVisible()
+  const heading = page.getByRole('heading', { name: '早上好，准备好开启新的一天了吗？' })
+  try {
+    await expect(heading).toBeVisible()
+  } catch (error) {
+    const diagnostics = await page.evaluate(async () => ({
+      controller: Boolean(navigator.serviceWorker.controller),
+      cacheKeys: await caches.keys(),
+      appText: document.querySelector('#app')?.innerText,
+      appMarkup: document.querySelector('#app')?.innerHTML.slice(0, 400),
+    }))
+    throw new Error(`Offline app shell did not render: ${JSON.stringify(diagnostics)}; ${String(error)}`)
+  }
   await expect(page.getByRole('button', { name: /企业$/ })).toBeVisible()
 })
 
@@ -35,7 +50,7 @@ test('PWA keeps a complete hiring flow in one browser and isolates another brows
 
   await pageA.getByRole('button', { name: '岗位', exact: true }).click()
   await pageA.getByRole('button', { name: '新建岗位' }).click()
-  await pageA.getByLabel('所属企业').click()
+  await openSelect(pageA, '所属企业')
   await pageA.getByText('本地验收企业', { exact: true }).last().click()
   await pageA.getByLabel('岗位名称').fill('浏览器本地工程师')
   await pageA.getByRole('button', { name: '保存岗位' }).click()
@@ -51,9 +66,9 @@ test('PWA keeps a complete hiring flow in one browser and isolates another brows
 
   await pageA.getByRole('button', { name: '投递', exact: true }).click()
   await pageA.getByRole('button', { name: '新建投递' }).click()
-  await pageA.getByLabel('岗位').click()
+  await openSelect(pageA, '岗位')
   await pageA.getByText(/本地验收企业 · 浏览器本地工程师/).click()
-  await pageA.getByLabel('绑定简历版本').click()
+  await openSelect(pageA, '绑定简历版本')
   await pageA.getByText('本地简历版本', { exact: true }).last().click()
   await pageA.getByLabel('投递渠道').fill('官网')
   await pageA.getByRole('button', { name: '保存投递' }).click()
@@ -64,7 +79,7 @@ test('PWA keeps a complete hiring flow in one browser and isolates another brows
   await pageA.getByRole('button', { name: '笔试与面试', exact: true }).click()
   await pageA.getByRole('button', { name: '面试' }).click()
   await pageA.getByRole('button', { name: '添加面试轮次' }).click()
-  await pageA.getByLabel('投递').click()
+  await openSelect(pageA, '投递')
   await pageA.getByText(/本地验收企业 · 浏览器本地工程师/).last().click()
   await pageA.getByLabel('轮次').fill('一面')
   const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000)
@@ -74,7 +89,7 @@ test('PWA keeps a complete hiring flow in one browser and isolates another brows
 
   await pageA.getByRole('button', { name: 'Offer', exact: true }).click()
   await pageA.getByRole('button', { name: '记录 Offer' }).click()
-  await pageA.getByLabel('对应投递').click()
+  await openSelect(pageA, '对应投递')
   await pageA.getByText(/本地验收企业 · 浏览器本地工程师/).last().click()
   await pageA.getByLabel('月薪').fill('20000')
   await pageA.getByRole('button', { name: '保存 Offer' }).click()
@@ -126,7 +141,7 @@ test('recruitment URL creates an editable manual draft but never auto-saves it',
   await page.getByLabel('企业名称').fill('手工草稿验收')
   await page.getByRole('button', { name: '保存企业' }).click()
   await page.getByRole('button', { name: '招聘链接采集', exact: true }).click()
-  await page.getByLabel('招聘链接').fill('https://example.com/careers/role')
+  await page.getByRole('textbox', { name: '招聘链接', exact: true }).fill('https://example.com/careers/role')
   await page.getByRole('button', { name: '打开链接并生成草稿' }).click()
   await expect(page.getByText(/纯浏览器 PWA 受招聘网站跨域限制/)).toBeVisible()
   await expect(page.getByLabel('职位描述（可编辑）')).toHaveValue(/请在新标签页打开招聘链接/)
