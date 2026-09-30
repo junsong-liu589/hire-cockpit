@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.List;
 import java.util.Base64;
 import java.time.*;
-import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -69,7 +68,7 @@ class WorkspaceIsolationTest {
         Instant interviewAt=Instant.now().plusSeconds(90*60L);
         ResponseEntity<String> interview=http.exchange(url("/api/v1/interviews"),HttpMethod.POST,new HttpEntity<>("{\"applicationId\":\""+applicationId+"\",\"roundName\":\"一面\",\"startsAt\":\""+interviewAt+"\",\"timeZone\":\"Asia/Shanghai\",\"rating\":8}",ah),String.class);
         assertThat(interview.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-        ResponseEntity<String> scheduled=http.exchange(url("/api/v1/calendar?from="+URLEncoder.encode(Instant.now().minusSeconds(60).toString(),StandardCharsets.UTF_8)+"&to="+URLEncoder.encode(interviewAt.plusSeconds(3600).toString(),StandardCharsets.UTF_8)),HttpMethod.GET,new HttpEntity<>(ah),String.class);
+        ResponseEntity<String> scheduled=http.exchange(url("/api/v1/calendar?from="+Instant.now().minusSeconds(60)+"&to="+interviewAt.plusSeconds(3600)),HttpMethod.GET,new HttpEntity<>(ah),String.class);
         assertThat(scheduled.getBody()).contains("一面");
         ResponseEntity<String> offer=http.exchange(url("/api/v1/offers"),HttpMethod.POST,new HttpEntity<>("{\"applicationId\":\""+applicationId+"\",\"baseSalary\":25000,\"bonus\":50000,\"workCity\":\"上海\",\"decision\":\"待决定\",\"evaluations\":{\"growth\":90,\"role\":85,\"location\":80,\"culture\":75}}",ah),String.class);
         assertThat(offer.getStatusCode()).isEqualTo(HttpStatus.CREATED);

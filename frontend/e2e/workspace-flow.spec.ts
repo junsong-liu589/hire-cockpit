@@ -8,6 +8,7 @@ test('production PWA manifest, service worker and offline shell', async ({ page,
   const pageErrors: string[] = []
   page.on('pageerror', error => pageErrors.push(error.message))
   page.on('console', message => { if (message.type() === 'error') pageErrors.push(message.text()) })
+  page.on('requestfailed', request => pageErrors.push(`${request.url()}: ${request.failure()?.errorText}`))
   await page.goto('/')
   await page.evaluate(() => navigator.serviceWorker.ready)
   const pwa = await page.evaluate(async () => {
@@ -58,7 +59,7 @@ test('PWA keeps a complete hiring flow in one browser and isolates another brows
   await pageA.getByText('本地验收企业', { exact: true }).last().click()
   await pageA.getByLabel('岗位名称').fill('浏览器本地工程师')
   await pageA.getByRole('button', { name: '保存岗位' }).click()
-  await expect(pageA.getByText('浏览器本地工程师')).toBeVisible()
+  await expect(pageA.locator('table').getByText('浏览器本地工程师')).toBeVisible()
 
   await pageA.getByRole('button', { name: '简历与材料', exact: true }).click()
   await pageA.getByRole('button', { name: '添加简历版本' }).click()
@@ -150,5 +151,5 @@ test('recruitment URL creates an editable manual draft but never auto-saves it',
   await expect(page.getByText(/纯浏览器 PWA 受招聘网站跨域限制/)).toBeVisible()
   await expect(page.getByLabel('职位描述（可编辑）')).toHaveValue(/请在新标签页打开招聘链接/)
   await page.getByRole('button', { name: '岗位', exact: true }).click()
-  await expect(page.getByText('暂无岗位记录')).toBeVisible()
+  await expect(page.getByText('尚无岗位')).toBeVisible()
 })
