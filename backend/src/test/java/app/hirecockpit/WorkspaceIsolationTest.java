@@ -106,6 +106,7 @@ class WorkspaceIsolationTest {
         HttpHeaders backupHeaders=headers(aCookie,aCsrf);backupHeaders.setContentType(MediaType.MULTIPART_FORM_DATA);LinkedMultiValueMap<String,Object> previewForm=new LinkedMultiValueMap<>();previewForm.add("file",new ByteArrayResource(backup.getBody()){@Override public String getFilename(){return "backup.zip";}});
         ResponseEntity<String> preview=http.exchange(url("/api/v1/backup/preview"),HttpMethod.POST,new HttpEntity<>(previewForm,backupHeaders),String.class);assertThat(preview.getStatusCode()).isEqualTo(HttpStatus.OK);assertThat(preview.getBody()).contains("sha256Verified","totalRows");
         ResponseEntity<String> restored=http.exchange(url("/api/v1/backup/restore"),HttpMethod.POST,new HttpEntity<>(previewForm,backupHeaders),String.class);assertThat(restored.getStatusCode()).as("restore response: %s",restored.getBody()).isEqualTo(HttpStatus.OK);
+        ResponseEntity<String> restoredStatuses=http.exchange(url("/api/v1/dictionaries/application_status"),HttpMethod.GET,new HttpEntity<>(ah),String.class);assertThat(restoredStatuses.getBody()).contains("已投递","OFFER");
         assertThat(http.exchange(url("/api/v1/companies"),HttpMethod.GET,new HttpEntity<>(ah),String.class).getBody()).contains("Private A");
         assertThat(http.exchange(url("/api/v1/companies"),HttpMethod.GET,new HttpEntity<>(bh),String.class).getBody()).doesNotContain("Private A");
         assertThat(http.exchange(url("/api/v1/collection-rules"),HttpMethod.GET,new HttpEntity<>(ah),String.class).getBody()).contains("Backend roles");

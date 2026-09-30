@@ -99,7 +99,7 @@ test('PWA keeps a complete hiring flow in one browser and isolates another brows
   await pageA.getByText(/本地验收企业 · 浏览器本地工程师/).last().click()
   await pageA.getByLabel('月薪').fill('20000')
   await pageA.getByRole('button', { name: '保存 Offer' }).click()
-  await expect(pageA.getByText('本地验收企业', { exact: true })).toBeVisible()
+  await expect(pageA.locator('table').getByText('本地验收企业', { exact: true })).toBeVisible()
   await pageA.getByRole('button', { name: '数据分析', exact: true }).click()
   await expect(pageA.getByText('投递漏斗')).toBeVisible()
 
@@ -108,7 +108,8 @@ test('PWA keeps a complete hiring flow in one browser and isolates another brows
   await pageA.getByLabel('事项').fill('验证待办持久化')
   await pageA.getByRole('button', { name: '保存待办' }).click()
   await pageA.reload()
-  await expect(pageA.getByText('本地验收企业', { exact: true })).toBeVisible()
+  await pageA.getByRole('button', { name: '企业', exact: true }).click()
+  await expect(pageA.locator('table').getByText('本地验收企业', { exact: true })).toBeVisible()
   await pageA.getByRole('button', { name: '日程', exact: true }).click()
   await expect(pageA.getByText('验证待办持久化')).toBeVisible()
 
