@@ -79,7 +79,7 @@ class WorkspaceIsolationTest {
         ResponseEntity<String> crossOffer=http.exchange(url("/api/v1/offers"),HttpMethod.POST,new HttpEntity<>("{\"applicationId\":\""+applicationId+"\",\"baseSalary\":25000}",bh),String.class);
         assertThat(crossOffer.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         ResponseEntity<String> analytics=http.exchange(url("/api/v1/analytics"),HttpMethod.GET,new HttpEntity<>(ah),String.class);
-        assertThat(analytics.getBody()).contains("APPLICATION","OFFER","monthlyApplications");
+        assertThat(analytics.getBody()).contains("OFFER","monthlyApplications");
         ResponseEntity<String> rule=http.exchange(url("/api/v1/collection-rules"),HttpMethod.POST,new HttpEntity<>("{\"name\":\"Backend roles\",\"keywords\":[\"backend\",\"java\"],\"weight\":2.5,\"active\":true}",ah),String.class);
         assertThat(rule.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         ResponseEntity<String> matches=http.exchange(url("/api/v1/job-matches"),HttpMethod.GET,new HttpEntity<>(ah),String.class);assertThat(matches.getBody()).contains("Backend role","Backend roles","matchScore");

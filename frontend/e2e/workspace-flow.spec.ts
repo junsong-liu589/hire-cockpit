@@ -77,7 +77,7 @@ test('PWA keeps a complete hiring flow in one browser and isolates another brows
   await pageA.getByText('本地简历版本', { exact: true }).last().click()
   await pageA.getByLabel('投递渠道').fill('官网')
   await pageA.getByRole('button', { name: '保存投递' }).click()
-  await expect(pageA.getByText('浏览器本地工程师')).toBeVisible()
+  await expect(pageA.locator('table').getByText('浏览器本地工程师')).toBeVisible()
 
   await pageA.locator('select').selectOption('面试中')
   await expect(pageA.locator('select')).toHaveValue('面试中')
