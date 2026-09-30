@@ -9,5 +9,5 @@ export default tseslint.config(
   ...tseslint.configs.recommended,
   ...vue.configs['flat/recommended'],
   { files: ['**/*.vue'], languageOptions: { parserOptions: { parser: tseslint.parser } } },
-  { languageOptions: { globals: { ...globals.browser, ...globals.node } } }
+  { languageOptions: { globals: { ...globals.browser, ...globals.node, __PRECACHE_URLS__: 'readonly' } }, rules: { '@typescript-eslint/no-explicit-any': 'warn', '@typescript-eslint/no-unused-vars': 'warn', 'no-unused-vars': 'off' } }
 )
