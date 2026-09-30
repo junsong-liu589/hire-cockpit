@@ -3,8 +3,8 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { api } from './api'
 import { stableStage } from './workflow'
 type Company = {id:string;name:string;shortName?:string;region?:string;nature?:string}
-type Job = {id:string;companyId:string;companyName:string;title:string;city?:string;deadline?:string;favorite:boolean;priority:string}
-type Application = {id:string;jobId:string;jobTitle:string;companyName:string;status:string;stage:string;appliedAt?:string}
+type Job = {id:string;companyId:string;companyName:string;title:string;department?:string;jobNumber?:string;city?:string;deadline?:string;favorite:boolean;priority:string}
+type Application = {id:string;jobId:string;jobTitle:string;companyName:string;status:string;stage:string;channel?:string;appliedAt?:string}
 type Resume = {id:string;name:string;direction?:string;version?:string;storedFileId?:string}
 type Task = {id:string;title:string;taskType:string;priority:string;dueAt?:string;timeZone?:string;completed:boolean;jobId?:string}
 type CalendarEvent = {id:string;title:string;eventType:string;startsAt:string;endsAt?:string;sourceType:string;timeZone?:string}
@@ -28,7 +28,7 @@ const comparisonLabels:Record<string,string>={compensation:'薪酬',growth:'成�
 const backupFile=ref<File|null>(null),backupPreview=ref<any>(null)
 const collectionUrl=ref(''),recruitmentDraft=ref<any>(null),collectionRules=ref<any[]>([]),jobMatches=ref<any[]>([]),ruleName=ref(''),ruleKeywords=ref(''),ruleWeight=ref(1)
 const offerDraft=reactive({applicationId:'',baseSalary:undefined as number|undefined,bonus:undefined as number|undefined,equity:undefined as number|undefined,workCity:'',workMode:'',receivedAt:'',responseDeadline:'',decision:'待决定',notes:'',evaluations:{growth:70,role:70,location:70,culture:70} as Record<string,number>})
-const jobDraft=reactive({companyId:'',title:'',department:'',jobNumber:'',recruitmentType:'秋招',batch:'',city:'',degreeRequirement:'',majorRequirement:'',skillRequirement:'',salary:'',deadline:'',sourceUrl:'',notes:'',favorite:false,priority:'B'})
+const jobDraft=reactive({companyId:'',title:'',department:'',jobNumber:'',recruitmentType:'秋招',batch:'',city:'',degreeRequirement:'',majorRequirement:'',skillRequirement:'',salary:'',deadline:'',sourceUrl:'',originalText:'',notes:'',favorite:false,priority:'B'})
 const applicationDraft=reactive({jobId:'',resumeVersionId:'',channel:'',platform:'',referrer:'',notes:'',status:'已投递',stage:'APPLICATION'})
 const counts=computed(()=>({companies:companies.value.length,favorites:jobs.value.filter(j=>j.favorite).length,applied:applications.value.length,interviews:applications.value.filter(a=>a.stage==='INTERVIEW').length,offers:applications.value.filter(a=>a.stage==='OFFER').length}))
 const unreadNotifications=computed(()=>notifications.value.filter(n=>!n.readAt).length)
@@ -79,7 +79,7 @@ async function completeTask(task:Task){try{await api.put(`/tasks/${task.id}/comp
 async function refreshNotifications(){try{notifications.value=(await api.get('/notifications')).data}catch{}}
 async function showNotifications(){notificationDialog.value=true;await refreshNotifications()}
 async function readNotification(item:Notification){try{await api.put(`/notifications/${item.id}/read`,{});notifications.value=notifications.value.map(n=>n.id===item.id?{...n,readAt:new Date().toISOString()}:n)}catch{error.value='提醒状态更新失败'}}
-async function createJob(){try{await api.post('/jobs',{...jobDraft,deadline:jobDraft.deadline||null});jobDialog.value=false;Object.assign(jobDraft,{companyId:'',title:'',department:'',jobNumber:'',recruitmentType:'秋招',batch:'',city:'',degreeRequirement:'',majorRequirement:'',skillRequirement:'',salary:'',deadline:'',sourceUrl:'',notes:'',favorite:false,priority:'B'});await load()}catch(e:any){error.value=e?.response?.data?.detail||'岗位保存失败'}}
+async function createJob(){try{await api.post('/jobs',{...jobDraft,deadline:jobDraft.deadline||null});jobDialog.value=false;Object.assign(jobDraft,{companyId:'',title:'',department:'',jobNumber:'',recruitmentType:'秋招',batch:'',city:'',degreeRequirement:'',majorRequirement:'',skillRequirement:'',salary:'',deadline:'',sourceUrl:'',originalText:'',notes:'',favorite:false,priority:'B'});await load()}catch(e:any){error.value=e?.response?.data?.detail||'岗位保存失败'}}
 async function createApplication(){try{await api.post('/applications',{...applicationDraft,resumeVersionId:applicationDraft.resumeVersionId||null});applicationDialog.value=false;Object.assign(applicationDraft,{jobId:'',resumeVersionId:'',channel:'',platform:'',referrer:'',notes:'',status:'已投递',stage:'APPLICATION'});await load()}catch(e:any){error.value=e?.response?.data?.detail||'投递保存失败'}}
 async function toggleFavorite(job:Job){try{await api.post(`/jobs/${job.id}/favorite`,{favorite:!job.favorite});await load()}catch(e:any){error.value='收藏状态更新失败'}}
 async function changeStatus(item:Application,event:Event){const target=(event.target as HTMLSelectElement).value;if(!target)return;const stage=stableStage(target);if(!stage){error.value='此状态尚未配置阶段映射';return}try{await api.put(`/applications/${item.id}/status`,{status:target,stage,note:'工作台更新'});await load()}catch(e:any){error.value='状态更新失败'}}

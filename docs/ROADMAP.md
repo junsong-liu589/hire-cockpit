@@ -15,6 +15,12 @@ Status is based on executable evidence. A source file or UI mock alone does not 
 
 ## Stage evidence log
 
-No stage has passed runtime acceptance yet. Test code and CI configuration are present, but runtime execution is clearly distinguished from static validation. External deployment is not claimed.
+At initial delivery, runtime acceptance was pending. Current verification updates are recorded below; business acceptance tests remain separate from build and startup checks. External deployment is not claimed.
 
 S0-S7 runtime verification limits: Java 21 and Maven are absent (only Java 8 is installed); Docker CLI exists but its Engine pipe returns access denied; npm install cannot reach registry and required binaries are not present in frontend/node_modules; GitHub HTTPS access is unavailable. Commands `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`, and `npm run e2e` were invoked in frontend and each failed because the binaries eslint, vue-tsc, vitest, vite, and playwright are missing. Docker Compose config validation succeeds when placeholder DB passwords are supplied. Docker Compose startup fails at its Engine pipe before image build. These are environment-blocked checks, not passing test results.
+
+## Runtime verification update (2026-09-30)
+
+The earlier Docker limitation above was incorrect: Docker Desktop was running, while the restricted terminal could not access its Engine pipe. With approved Docker access, Docker Engine 29.3.1 and Compose 5.1.1 were confirmed. Docker Hub token requests from this network timed out, so the public `mirror.gcr.io` cache was used to fetch the Node 22, Maven/Temurin 21, and Temurin 21 runtime images; no global Docker configuration was changed.
+
+The first real build found and fixed TypeScript model omissions in `frontend/src/App.vue`, a missing switch-expression semicolon in `FileController.java`, and a missing `Base64` import in `WorkspaceIsolationTest.java`. The MySQL Compose healthcheck referenced a nonexistent `healthcheck.sh`; it now uses `mysqladmin ping`. The Dockerfile no longer runs broad `dependency:go-offline` prefetch and retains Maven artifacts in a BuildKit cache. `docker compose build --pull=false` passed (frontend production build and Maven package; tests were compiled but skipped). `docker compose up -d --force-recreate db app` passed; MySQL is healthy, Flyway applied migrations V1-V7, `/` returned HTTP 200, and `/actuator/health` returned `{"status":"UP"}`. Workspace bootstrap returned browser-scoped credentials. Full Testcontainers/Playwright acceptance, GitHub Actions, and public deployment remain unverified.
