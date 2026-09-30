@@ -21,6 +21,7 @@ The user selected an installable, free-to-host PWA after clarifying that each ro
 - `npm test`: passed, 2 workflow unit tests. Vitest collection is restricted to `src/**/*.test.ts`, separate from Playwright E2E.
 - New Playwright acceptance exercises standalone manifest/icon requirements, worker activation/offline navigation, two-context separation, enterprise/job/resume/file/application/interview/offer/analytics/task flow, reload persistence, JSON export/import, and non-persisted recruitment draft. The full Playwright suite is configured for Chromium CI but has not run locally; Edge manual offline and core reload checks passed.
 - Edge Chromium manually verified an active service worker, complete project-path precache, and successful fresh navigation after emulating a disconnected network. The automated Chromium E2E suite (including two-context isolation, restore, and recruitment-draft gates), native install prompt, GitHub Actions, GitHub Pages settings, fixed public URL, and public deployment remain pending; they are not claimed complete.
+- PWA source and documentation are committed in `fdef476` (`feat: ship local-first hiring cockpit PWA`). Two `git push origin main` attempts failed with `Recv failure: Connection was reset`; GitHub Actions was therefore not triggered, and no remote deployment is claimed.
 
 Status is based on executable evidence. A source file or UI mock alone does not close an acceptance item.
 
