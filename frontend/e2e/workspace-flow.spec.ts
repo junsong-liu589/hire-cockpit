@@ -13,6 +13,8 @@ test('production PWA manifest, service worker and offline shell', async ({ page,
   expect(pwa.iconSizes).toContain('192x192')
   expect(pwa.iconSizes).toContain('512x512')
   expect(pwa.activeWorkers).toBeGreaterThan(0)
+  if (!await page.evaluate(() => Boolean(navigator.serviceWorker.controller))) await page.reload()
+  await expect.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true)
   await context.setOffline(true)
   await page.reload()
   await expect(page.getByRole('heading', { name: '早上好，准备好开启新的一天了吗？' })).toBeVisible()
