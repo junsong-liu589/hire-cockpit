@@ -1,10 +1,12 @@
 # Hire Cockpit 求职驾驶舱
 
+**立即打开网页版：<https://junsong-liu589.github.io/hire-cockpit/>**
+
 Hire Cockpit 是一个可安装的本地优先 PWA。舍友打开发布网址即可使用，不用安装 Docker、配置数据库或申请 AI 密钥。添加的企业、岗位、投递、笔面试、Offer、日程、附件和个人资料只写入各自设备浏览器的 IndexedDB，不会上传给本项目服务器，也不会自动跨设备同步。
 
 ## 使用者如何打开
 
-发布完成后，在电脑或手机浏览器打开仓库的 GitHub Pages 地址；浏览器支持时，可选择“安装应用”或“添加到主屏幕”。初次加载后应用外壳可离线打开。请优先使用 Chrome、Edge、Safari 或 Firefox 的最新版。保存、导出和恢复方式请看[使用手册](docs/PWA-USER-GUIDE.md)。
+在电脑或手机浏览器打开[Hire Cockpit 网页版](https://junsong-liu589.github.io/hire-cockpit/)；浏览器支持时，可选择“安装应用”或“添加到主屏幕”。初次加载后应用外壳可离线打开。请优先使用 Chrome、Edge、Safari 或 Firefox 的最新版。保存、导出和恢复方式请看[使用手册](docs/PWA-USER-GUIDE.md)。
 
 ## 免费发布到 GitHub Pages
 
