@@ -11,7 +11,7 @@ export default defineConfig({
     browserName: 'chromium',
     launchOptions: process.env.PLAYWRIGHT_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH } : undefined,
   },
-  webServer: { command: `npm run build && npx vite preview --host 127.0.0.1 --port ${e2ePort} --strictPort`, url: `http://127.0.0.1:${e2ePort}`, reuseExistingServer: false, timeout: 60_000 },
+  webServer: { command: `npm run build && node ./node_modules/vite/bin/vite.js preview --host 127.0.0.1 --port ${e2ePort} --strictPort`, url: `http://127.0.0.1:${e2ePort}`, reuseExistingServer: false, timeout: 60_000 },
   timeout: 30_000,
   expect: { timeout: 7_000 }
 })
