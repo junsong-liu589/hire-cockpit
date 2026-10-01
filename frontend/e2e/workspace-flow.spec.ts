@@ -104,7 +104,7 @@ test('PWA keeps a complete hiring flow in one browser and isolates another brows
   await expect(pageA.getByText('投递漏斗')).toBeVisible()
 
   await pageA.getByRole('button', { name: '日程', exact: true }).click()
-  await pageA.getByRole('button', { name: '＋ 创建任务' }).click()
+  await pageA.getByRole('button', { name: '＋ 新建待办' }).click()
   await pageA.getByLabel('事项').fill('验证待办持久化')
   await pageA.getByRole('button', { name: '保存待办' }).click()
   await pageA.reload()
