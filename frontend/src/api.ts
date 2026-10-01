@@ -37,11 +37,49 @@ async function put(table: Table, value: Row) {
     t.oncomplete = () => resolve(); t.onerror = () => reject(t.error)
   })
 }
-async function remove(table: Table, id: string) {
+async function deleteRows(rows: Array<[Table, string]>, updates: Array<[Table, Row]> = []) {
   const d = await db(); return new Promise<void>((resolve, reject) => {
-    const t = d.transaction('records', 'readwrite'); t.objectStore('records').delete([table, id]);
-    t.oncomplete = () => resolve(); t.onerror = () => reject(t.error)
+    const t = d.transaction('records', 'readwrite'), store = t.objectStore('records')
+    for (const [table, id] of rows) store.delete([table, id])
+    for (const [table, value] of updates) store.put({ table, id: value.id, value })
+    t.oncomplete = () => resolve(); t.onerror = () => reject(t.error); t.onabort = () => reject(t.error || new Error('删除事务失败'))
   })
+}
+async function deleteCascade(table: Table, id: string) {
+  if (!await get(table, id)) fail('记录不存在或已删除')
+  const rows: Array<[Table, string]> = [[table, id]], removed = new Map<Table, Set<string>>([[table,new Set([id])]])
+  const add = (kind: Table, rowId: string) => { const ids=removed.get(kind)||new Set<string>(); ids.add(rowId); removed.set(kind,ids); rows.push([kind,rowId]) }
+  const allRows = await Promise.all((['jobs','applications','tasks','exams','interviews','offers','history','experienceNotes','events','notifications','files','resumes'] as Table[]).map(async kind => [kind, await all(kind)] as const))
+  const data = new Map<Table, Row[]>(allRows)
+  const jobs = new Set<string>(), apps = new Set<string>()
+  if (table === 'companies') for (const job of data.get('jobs')!) if (job.companyId === id) jobs.add(job.id)
+  if (table === 'jobs') jobs.add(id)
+  if (table === 'applications') apps.add(id)
+  if (jobs.size) for (const app of data.get('applications')!) if (jobs.has(app.jobId)) apps.add(app.id)
+  for (const jobId of jobs) if (table !== 'jobs' || jobId !== id) add('jobs', jobId)
+  for (const appId of apps) add('applications', appId)
+  for (const task of data.get('tasks')!) if (jobs.has(task.jobId)) add('tasks', task.id)
+  for (const kind of ['exams','interviews','offers','history'] as Table[]) for (const item of data.get(kind)!) if (apps.has(item.applicationId)) add(kind,item.id)
+  for (const note of data.get('experienceNotes')!) if (jobs.has(note.jobId) || (table==='companies' && note.companyId===id)) add('experienceNotes',note.id)
+  for (const event of data.get('events')!) if (jobs.has(event.jobId) || apps.has(event.applicationId) || (table==='companies' && event.companyId===id)) add('events',event.id)
+  for (const notice of data.get('notifications')!) if ((notice.sourceType==='JOB'&&jobs.has(notice.sourceId)) || (notice.sourceType==='TASK'&&(removed.get('tasks')||new Set()).has(notice.sourceId))) add('notifications',notice.id)
+  const updates: Array<[Table,Row]> = []
+  if(table==='offers') {
+    const offer=data.get('offers')!.find(x=>x.id===id), application=data.get('applications')!.find(x=>x.id===offer?.applicationId)
+    if(application && !data.get('offers')!.some(x=>x.id!==id&&x.applicationId===application.id)) {
+      const previous=data.get('history')!.filter(x=>x.applicationId===application.id&&x.stage!=='OFFER').sort((a,b)=>String(b.changedAt||'').localeCompare(String(a.changedAt||'')))[0]
+      updates.push(['applications',{...application,status:previous?.status||'已投递',stage:previous?.stage||'APPLICATION',updatedAt:now()}])
+    }
+  }
+  if (table==='resumes') {
+    for (const app of data.get('applications')!) if(app.resumeVersionId===id) updates.push(['applications',{...app,resumeVersionId:null,updatedAt:now()}])
+    const resume=data.get('resumes')!.find(x=>x.id===id)
+    if(resume?.storedFileId && !data.get('resumes')!.some(x=>x.id!==id&&x.storedFileId===resume.storedFileId)) add('files',resume.storedFileId)
+  }
+  if(table==='files') {
+    for(const resume of data.get('resumes')!) if(resume.storedFileId===id) updates.push(['resumes',{...resume,storedFileId:null,updatedAt:now()}])
+  }
+  await deleteRows(rows,updates)
 }
 const now = () => new Date().toISOString()
 const uuid = () => crypto.randomUUID()
@@ -58,8 +96,11 @@ function fail(message: string): never { throw Object.assign(new Error(message), 
 async function payloadBlob(file: Blob) { return new Promise<string>((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result));r.onerror=()=>reject(r.error);r.readAsDataURL(file)}) }
 async function route(method: string, rawUrl: string, body?: any, config?: any): Promise<any> {
   const url = new URL(rawUrl, location.origin), path = url.pathname.replace(/^\/api\/v1/, '').replace(/\/$/, '') || '/', p = path.split('/').filter(Boolean).map(decodeURIComponent), query=url.searchParams
+  if(path==='/workspace/current'&&method==='DELETE'){const d=await db();await new Promise<void>((resolve,reject)=>{const t=d.transaction(['records','settings'],'readwrite');t.objectStore('records').clear();t.objectStore('settings').clear();t.oncomplete=()=>resolve();t.onerror=()=>reject(t.error);t.onabort=()=>reject(t.error||new Error('清空事务失败'))});return response({cleared:true})}
   if (method==='GET' && path==='/workspaces/current') return response({id:'this-browser',name:'本地浏览器',storage:'IndexedDB'})
-  if (path.startsWith('/profiles/')) { const section=p[1], id=p[2]; if(method==='GET')return response((await list('profiles')).filter(x=>x.section===section));if(method==='POST')return response(await save('profiles',{...body,section,visibleFields:body.visibleFields||Object.keys(body.fields||[])}));if(method==='PUT'){const old=await get('profiles',id);if(!old)fail('资料不存在');return response(await save('profiles',{...old,...body,section,id}))}if(method==='DELETE'){await remove('profiles',id);return response(null)} }
+  if (path.startsWith('/profiles/')) { const section=p[1], id=p[2]; if(method==='GET')return response((await list('profiles')).filter(x=>x.section===section));if(method==='POST')return response(await save('profiles',{...body,section,visibleFields:body.visibleFields||Object.keys(body.fields||[])}));if(method==='PUT'){const old=await get('profiles',id);if(!old)fail('资料不存在');return response(await save('profiles',{...old,...body,section,id}))}if(method==='DELETE'){await deleteCascade('profiles',id);return response(null)} }
+  const deletionRoutes: Record<string,Table> = {'companies':'companies','jobs':'jobs','applications':'applications','resumes':'resumes','tasks':'tasks','events':'events','exams':'exams','interviews':'interviews','experience-notes':'experienceNotes','offers':'offers','collection-rules':'collectionRules','files':'files','notifications':'notifications','dictionaries':'dictionaries','tags':'tags'}
+  if(method==='DELETE' && p.length===2 && deletionRoutes[p[0]]) { await deleteCascade(deletionRoutes[p[0]],p[1]); return response(null) }
   if (path==='/companies') {if(method==='GET')return response((await list('companies')).filter(x=>!query.get('q')||x.name?.includes(query.get('q')!)));if(method==='POST')return response(await save('companies',body))}
   if (p[0]==='companies' && p[1]) {const id=p[1];if(method==='GET'){const x=await get('companies',id);return x?response(x):fail('企业不存在')}if(method==='PUT'){const old=await get('companies',id);if(!old)fail('企业不存在');return response(await save('companies',{...old,...body,id}))}}
   if (path==='/jobs') {if(method==='GET'){let rows=await joinJobs();if(query.has('favorite'))rows=rows.filter(x=>x.favorite=== (query.get('favorite')==='true'));if(query.has('companyId'))rows=rows.filter(x=>x.companyId===query.get('companyId'));if(query.get('q'))rows=rows.filter(x=>`${x.title} ${x.companyName}`.includes(query.get('q')!));return response(rows)}if(method==='POST'){if(!await get('companies',body.companyId))fail('請先選擇有效企業');return response(await save('jobs',body))}}
