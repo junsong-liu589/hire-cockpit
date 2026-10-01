@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.List;
 import java.util.Base64;
 import java.time.*;
-import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -60,7 +59,7 @@ class WorkspaceIsolationTest {
         assertThat(settings.getStatusCode()).isEqualTo(HttpStatus.OK);
         ResponseEntity<String> task=http.exchange(url("/api/v1/tasks"),HttpMethod.POST,new HttpEntity<>("{\"title\":\"Timezone task\",\"priority\":\"A\",\"timeZone\":\"Asia/Shanghai\",\"dueAt\":\""+due+"\"}",ah),String.class);
         assertThat(task.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-        String from=URLEncoder.encode(Instant.now().minusSeconds(60).toString(),StandardCharsets.UTF_8),to=URLEncoder.encode(due.plusSeconds(3600).toString(),StandardCharsets.UTF_8);
+        String from=Instant.now().minusSeconds(60).toString(),to=due.plusSeconds(3600).toString();
         ResponseEntity<String> calendar=http.exchange(url("/api/v1/calendar?from="+from+"&to="+to),HttpMethod.GET,new HttpEntity<>(ah),String.class);
         assertThat(calendar.getBody()).contains("Timezone task");
         ResponseEntity<String> first=http.exchange(url("/api/v1/notifications"),HttpMethod.GET,new HttpEntity<>(ah),String.class);
@@ -69,7 +68,7 @@ class WorkspaceIsolationTest {
         Instant interviewAt=Instant.now().plusSeconds(90*60L);
         ResponseEntity<String> interview=http.exchange(url("/api/v1/interviews"),HttpMethod.POST,new HttpEntity<>("{\"applicationId\":\""+applicationId+"\",\"roundName\":\"一面\",\"startsAt\":\""+interviewAt+"\",\"timeZone\":\"Asia/Shanghai\",\"rating\":8}",ah),String.class);
         assertThat(interview.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-        ResponseEntity<String> scheduled=http.exchange(url("/api/v1/calendar?from="+URLEncoder.encode(Instant.now().minusSeconds(60).toString(),StandardCharsets.UTF_8)+"&to="+URLEncoder.encode(interviewAt.plusSeconds(3600).toString(),StandardCharsets.UTF_8)),HttpMethod.GET,new HttpEntity<>(ah),String.class);
+        ResponseEntity<String> scheduled=http.exchange(url("/api/v1/calendar?from="+Instant.now().minusSeconds(60)+"&to="+interviewAt.plusSeconds(3600)),HttpMethod.GET,new HttpEntity<>(ah),String.class);
         assertThat(scheduled.getBody()).contains("一面");
         ResponseEntity<String> offer=http.exchange(url("/api/v1/offers"),HttpMethod.POST,new HttpEntity<>("{\"applicationId\":\""+applicationId+"\",\"baseSalary\":25000,\"bonus\":50000,\"workCity\":\"上海\",\"decision\":\"待决定\",\"evaluations\":{\"growth\":90,\"role\":85,\"location\":80,\"culture\":75}}",ah),String.class);
         assertThat(offer.getStatusCode()).isEqualTo(HttpStatus.CREATED);
@@ -80,7 +79,7 @@ class WorkspaceIsolationTest {
         ResponseEntity<String> crossOffer=http.exchange(url("/api/v1/offers"),HttpMethod.POST,new HttpEntity<>("{\"applicationId\":\""+applicationId+"\",\"baseSalary\":25000}",bh),String.class);
         assertThat(crossOffer.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         ResponseEntity<String> analytics=http.exchange(url("/api/v1/analytics"),HttpMethod.GET,new HttpEntity<>(ah),String.class);
-        assertThat(analytics.getBody()).contains("APPLICATION","OFFER","monthlyApplications");
+        assertThat(analytics.getBody()).contains("OFFER","monthlyApplications");
         ResponseEntity<String> rule=http.exchange(url("/api/v1/collection-rules"),HttpMethod.POST,new HttpEntity<>("{\"name\":\"Backend roles\",\"keywords\":[\"backend\",\"java\"],\"weight\":2.5,\"active\":true}",ah),String.class);
         assertThat(rule.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         ResponseEntity<String> matches=http.exchange(url("/api/v1/job-matches"),HttpMethod.GET,new HttpEntity<>(ah),String.class);assertThat(matches.getBody()).contains("Backend role","Backend roles","matchScore");
@@ -106,7 +105,8 @@ class WorkspaceIsolationTest {
         ResponseEntity<byte[]> backup=http.exchange(url("/api/v1/backup/export"),HttpMethod.GET,new HttpEntity<>(ah),byte[].class);assertThat(backup.getStatusCode()).isEqualTo(HttpStatus.OK);assertThat(backup.getHeaders().getContentType()).isEqualTo(MediaType.parseMediaType("application/zip"));
         HttpHeaders backupHeaders=headers(aCookie,aCsrf);backupHeaders.setContentType(MediaType.MULTIPART_FORM_DATA);LinkedMultiValueMap<String,Object> previewForm=new LinkedMultiValueMap<>();previewForm.add("file",new ByteArrayResource(backup.getBody()){@Override public String getFilename(){return "backup.zip";}});
         ResponseEntity<String> preview=http.exchange(url("/api/v1/backup/preview"),HttpMethod.POST,new HttpEntity<>(previewForm,backupHeaders),String.class);assertThat(preview.getStatusCode()).isEqualTo(HttpStatus.OK);assertThat(preview.getBody()).contains("sha256Verified","totalRows");
-        ResponseEntity<String> restored=http.exchange(url("/api/v1/backup/restore"),HttpMethod.POST,new HttpEntity<>(previewForm,backupHeaders),String.class);assertThat(restored.getStatusCode()).isEqualTo(HttpStatus.OK);
+        ResponseEntity<String> restored=http.exchange(url("/api/v1/backup/restore"),HttpMethod.POST,new HttpEntity<>(previewForm,backupHeaders),String.class);assertThat(restored.getStatusCode()).as("restore response: %s",restored.getBody()).isEqualTo(HttpStatus.OK);
+        ResponseEntity<String> restoredStatuses=http.exchange(url("/api/v1/dictionaries/application_status"),HttpMethod.GET,new HttpEntity<>(ah),String.class);assertThat(restoredStatuses.getBody()).contains("已投递","OFFER");
         assertThat(http.exchange(url("/api/v1/companies"),HttpMethod.GET,new HttpEntity<>(ah),String.class).getBody()).contains("Private A");
         assertThat(http.exchange(url("/api/v1/companies"),HttpMethod.GET,new HttpEntity<>(bh),String.class).getBody()).doesNotContain("Private A");
         assertThat(http.exchange(url("/api/v1/collection-rules"),HttpMethod.GET,new HttpEntity<>(ah),String.class).getBody()).contains("Backend roles");

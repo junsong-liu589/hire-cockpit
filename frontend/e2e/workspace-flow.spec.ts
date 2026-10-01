@@ -1,6 +1,14 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
+
+async function openSelect(page: Page, label: string) {
+  await page.locator('.el-form-item').filter({ hasText: label }).locator('.el-select__wrapper').click()
+}
 
 test('production PWA manifest, service worker and offline shell', async ({ page, context }) => {
+  const pageErrors: string[] = []
+  page.on('pageerror', error => pageErrors.push(error.message))
+  page.on('console', message => { if (message.type() === 'error') pageErrors.push(message.text()) })
+  page.on('requestfailed', request => pageErrors.push(`${request.url()}: ${request.failure()?.errorText}`))
   await page.goto('/')
   await page.evaluate(() => navigator.serviceWorker.ready)
   const pwa = await page.evaluate(async () => {
@@ -13,9 +21,23 @@ test('production PWA manifest, service worker and offline shell', async ({ page,
   expect(pwa.iconSizes).toContain('192x192')
   expect(pwa.iconSizes).toContain('512x512')
   expect(pwa.activeWorkers).toBeGreaterThan(0)
+  if (!await page.evaluate(() => Boolean(navigator.serviceWorker.controller))) await page.reload()
+  await expect.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true)
   await context.setOffline(true)
   await page.reload()
-  await expect(page.getByRole('heading', { name: '早上好，准备好开启新的一天了吗？' })).toBeVisible()
+  const heading = page.getByRole('heading', { name: '早上好，准备好开启新的一天了吗？' })
+  try {
+    await expect(heading).toBeVisible()
+  } catch (error) {
+    const diagnostics = await page.evaluate(async () => ({
+      controller: Boolean(navigator.serviceWorker.controller),
+      cacheEntries: await Promise.all((await caches.keys()).map(async key => ({ key, urls: (await (await caches.open(key)).keys()).map(request => new URL(request.url).pathname) }))),
+      scripts: Array.from(document.scripts, script => script.src),
+      appText: document.querySelector('#app')?.innerText,
+      appMarkup: document.querySelector('#app')?.innerHTML.slice(0, 400),
+    }))
+    throw new Error(`Offline app shell did not render: ${JSON.stringify({ ...diagnostics, pageErrors })}; ${String(error)}`)
+  }
   await expect(page.getByRole('button', { name: /企业$/ })).toBeVisible()
 })
 
@@ -29,63 +51,67 @@ test('PWA keeps a complete hiring flow in one browser and isolates another brows
   await pageA.getByRole('button', { name: '新建企业' }).click()
   await pageA.getByLabel('企业名称').fill('本地验收企业')
   await pageA.getByRole('button', { name: '保存企业' }).click()
-  await expect(pageA.getByText('本地验收企业')).toBeVisible()
+  await expect(pageA.getByText('本地验收企业', { exact: true })).toBeVisible()
 
   await pageA.getByRole('button', { name: '岗位', exact: true }).click()
   await pageA.getByRole('button', { name: '新建岗位' }).click()
-  await pageA.getByLabel('所属企业').click()
+  await openSelect(pageA, '所属企业')
   await pageA.getByText('本地验收企业', { exact: true }).last().click()
   await pageA.getByLabel('岗位名称').fill('浏览器本地工程师')
   await pageA.getByRole('button', { name: '保存岗位' }).click()
-  await expect(pageA.getByText('浏览器本地工程师')).toBeVisible()
+  await expect(pageA.locator('table').getByText('浏览器本地工程师')).toBeVisible()
 
   await pageA.getByRole('button', { name: '简历与材料', exact: true }).click()
   await pageA.getByRole('button', { name: '添加简历版本' }).click()
   await pageA.getByLabel('版本名称').fill('本地简历版本')
-  await pageA.getByLabel('简历附件').setInputFiles({ name: 'resume.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\nlocal PWA acceptance') })
+  await pageA.locator('input[type="file"][aria-label="简历附件"]').setInputFiles({ name: 'resume.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\nlocal PWA acceptance') })
   await expect(pageA.getByText('附件已上传并绑定到版本')).toBeVisible()
   await pageA.getByRole('button', { name: '保存版本' }).click()
   await expect(pageA.getByText('本地简历版本')).toBeVisible()
 
   await pageA.getByRole('button', { name: '投递', exact: true }).click()
   await pageA.getByRole('button', { name: '新建投递' }).click()
-  await pageA.getByLabel('岗位').click()
+  await openSelect(pageA, '岗位')
   await pageA.getByText(/本地验收企业 · 浏览器本地工程师/).click()
-  await pageA.getByLabel('绑定简历版本').click()
+  await openSelect(pageA, '绑定简历版本')
   await pageA.getByText('本地简历版本', { exact: true }).last().click()
   await pageA.getByLabel('投递渠道').fill('官网')
   await pageA.getByRole('button', { name: '保存投递' }).click()
-  await expect(pageA.getByText('浏览器本地工程师')).toBeVisible()
+  await expect(pageA.locator('table').getByText('浏览器本地工程师')).toBeVisible()
 
   await pageA.locator('select').selectOption('面试中')
   await expect(pageA.locator('select')).toHaveValue('面试中')
   await pageA.getByRole('button', { name: '笔试与面试', exact: true }).click()
-  await pageA.getByRole('button', { name: '面试' }).click()
-  await pageA.getByRole('button', { name: '添加面试轮次' }).click()
-  await pageA.getByLabel('投递').click()
+  await pageA.getByRole('button', { name: '面试', exact: true }).click()
+  await pageA.getByRole('button', { name: '添加面试' }).click()
+  await openSelect(pageA, '投递')
   await pageA.getByText(/本地验收企业 · 浏览器本地工程师/).last().click()
-  await pageA.getByLabel('轮次').fill('一面')
+  const interviewDialog = pageA.getByRole('dialog', { name: '添加面试轮次' })
+  await interviewDialog.getByLabel('轮次').fill('一面')
   const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000)
   await pageA.getByLabel('时间').fill(`${tomorrow.getFullYear()}-${String(tomorrow.getMonth()+1).padStart(2,'0')}-${String(tomorrow.getDate()).padStart(2,'0')}T10:00:00`)
-  await pageA.getByRole('button', { name: '保存面试' }).click()
+  await interviewDialog.getByRole('button', { name: '保存面试' }).click()
   await expect(pageA.getByText('一面')).toBeVisible()
 
   await pageA.getByRole('button', { name: 'Offer', exact: true }).click()
   await pageA.getByRole('button', { name: '记录 Offer' }).click()
-  await pageA.getByLabel('对应投递').click()
+  await openSelect(pageA, '对应投递')
   await pageA.getByText(/本地验收企业 · 浏览器本地工程师/).last().click()
   await pageA.getByLabel('月薪').fill('20000')
   await pageA.getByRole('button', { name: '保存 Offer' }).click()
-  await expect(pageA.getByText('本地验收企业')).toBeVisible()
+  await expect(pageA.locator('table').getByText('本地验收企业', { exact: true })).toBeVisible()
   await pageA.getByRole('button', { name: '数据分析', exact: true }).click()
   await expect(pageA.getByText('投递漏斗')).toBeVisible()
 
   await pageA.getByRole('button', { name: '日程', exact: true }).click()
-  await pageA.getByRole('button', { name: '＋ 创建任务' }).click()
+  await pageA.getByRole('button', { name: '＋ 新建待办' }).click()
   await pageA.getByLabel('事项').fill('验证待办持久化')
   await pageA.getByRole('button', { name: '保存待办' }).click()
+  await expect(pageA.getByText('验证待办持久化')).toBeVisible()
   await pageA.reload()
-  await expect(pageA.getByText('本地验收企业')).toBeVisible()
+  await expect(pageA.getByText('已记录 1 条投递')).toBeVisible()
+  await pageA.getByRole('button', { name: '企业', exact: true }).click()
+  await expect(pageA.locator('table').getByText('本地验收企业', { exact: true })).toBeVisible()
   await pageA.getByRole('button', { name: '日程', exact: true }).click()
   await expect(pageA.getByText('验证待办持久化')).toBeVisible()
 
@@ -105,7 +131,7 @@ test('PWA keeps a complete hiring flow in one browser and isolates another brows
   pageB.once('dialog', dialog => dialog.accept())
   await pageB.getByRole('button', { name: '确认替换并恢复' }).click()
   await pageB.getByRole('button', { name: '企业', exact: true }).click()
-  await expect(pageB.getByText('本地验收企业')).toBeVisible()
+  await expect(pageB.getByText('本地验收企业', { exact: true })).toBeVisible()
   await pageB.getByRole('button', { name: '岗位', exact: true }).click()
   await expect(pageB.getByText('浏览器本地工程师')).toBeVisible()
   await pageB.getByRole('button', { name: '简历与材料', exact: true }).click()
@@ -124,10 +150,10 @@ test('recruitment URL creates an editable manual draft but never auto-saves it',
   await page.getByLabel('企业名称').fill('手工草稿验收')
   await page.getByRole('button', { name: '保存企业' }).click()
   await page.getByRole('button', { name: '招聘链接采集', exact: true }).click()
-  await page.getByLabel('招聘链接').fill('https://example.com/careers/role')
+  await page.getByRole('textbox', { name: '招聘链接', exact: true }).fill('https://example.com/careers/role')
   await page.getByRole('button', { name: '打开链接并生成草稿' }).click()
   await expect(page.getByText(/纯浏览器 PWA 受招聘网站跨域限制/)).toBeVisible()
   await expect(page.getByLabel('职位描述（可编辑）')).toHaveValue(/请在新标签页打开招聘链接/)
   await page.getByRole('button', { name: '岗位', exact: true }).click()
-  await expect(page.getByText('暂无岗位记录')).toBeVisible()
+  await expect(page.getByText('尚无岗位')).toBeVisible()
 })
