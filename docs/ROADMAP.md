@@ -72,3 +72,11 @@ The earlier Docker limitation above was incorrect: Docker Desktop was running, w
 - Local verification: `npm run typecheck`, `npm test` (12/12), `npm run lint -- --quiet` (0 errors), and `npm run build` pass. `PWA_BASE_PATH=/hire-cockpit/ npm run build` also passes with the GitHub Pages base path. The standard lint command remains warning-only; the production build reports the existing main-bundle size warning. GitHub Actions and Pages deployment evidence will be added after the release workflow completes.
 - [The PWA user guide](PWA-USER-GUIDE.md) now documents these workflows, local limits, and human confirmation points.
 - Build, test counts, Git commit, and CI/PR status will be added after verification. The deployment URL above still serves the previously approved PWA release until the user reviews and approves these changes.
+
+## Linux CI build fix (2026-10-02)
+
+- PR #6 Actions run 28 reported `backend` passing and `frontend` plus `compose-smoke` failing during the frontend production build. Docker reproduction identified the first real error: the Windows-generated npm lockfile omitted the Linux x64 optional native packages, including Rollup's musl binary required by the Alpine image.
+- Added integrity-pinned lockfile records for Rollup Linux x64 GNU/musl and esbuild Linux x64, and changed CI, Pages, Docker, and deployment instructions to use `npm ci` so installs follow the lockfile reproducibly.
+- Linux Node 22 verification in a disposable copy passed: `npm install`, lint (0 errors; existing warnings only), typecheck, Vitest (12/12), and production build.
+- Isolated Compose verification passed both default and production config parsing. With a separate project name and port, Compose built the corrected image, started MySQL 8.4 healthy, and returned `UP` from `/actuator/health`; the test containers and volumes were removed afterward. The pre-existing `hire-cockpit` stack and data volumes were left running and untouched.
+- The package-lock/Docker fix is locally verified. Remote Actions rerun, PR merge, and Pages deployment remain pending delivery of this commit to PR #6.
