@@ -12,7 +12,7 @@
 4. 在 Settings → Pages 取得发布网址（项目 Pages 通常形如 `https://<owner>.github.io/hire-cockpit/`），HTTPS 页面是安装 PWA 和使用持久存储 API 的环境。
 5. 管理员把固定网址发给使用者。第一次打开需联网；安装后已缓存的应用外壳支持离线启动。
 
-此仓库尚未从本机对 GitHub Pages 完成设置或真实公网发布；需要仓库 Settings 权限和成功运行的 GitHub Actions。GitHub Pages 免费方案面向公开仓库；仓库公开意味着源代码公开，不意味着本地 IndexedDB 数据公开。
+此仓库已通过 GitHub Actions 发布到 https://junsong-liu589.github.io/hire-cockpit/；发布和验证记录见 [ROADMAP](ROADMAP.md)。GitHub Pages 免费方案面向公开仓库；仓库公开意味着源代码公开，不意味着本地 IndexedDB 数据公开。
 
 ## 发布配置
 
