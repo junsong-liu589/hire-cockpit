@@ -17,7 +17,7 @@
 ## 发布配置
 
 - workflow：`.github/workflows/pages.yml`
-- 构建命令：`npm install && npm run lint && npm run typecheck && npm test && npm run build`
+- 构建命令：`npm ci && npm run lint && npm run typecheck && npm test && npm run build`
 - GitHub Pages 项目路径：`/hire-cockpit/`，通过 `PWA_BASE_PATH` 配置 Vite；仓库改名时同步修改 workflow 的路径。
 - 发布权限限于 `contents: read`、`pages: write`、`id-token: write`；使用官方 Pages artifact/deploy Actions。
 
@@ -25,7 +25,7 @@
 
 ```powershell
 cd frontend
-npm install
+npm ci
 npm run lint
 npm run typecheck
 npm test
